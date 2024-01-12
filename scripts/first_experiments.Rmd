@@ -13,18 +13,66 @@ BiocManager::install("EBImage")
 library(EBImage)
 ```
 
+loading image in
+
 ```{r}
 img <- readImage("data/trial.tif")
 ```
+
+viewing image 
 
 ```{r}
 display(img, method="browser") # using browser method runs java script through web brower to view object 
 display(img, method="raster") # uses r's default method allows combo with other plotting functionality to add labels etc 
 ```
 
+expolration of image 
+
 ```{r}
-hist(img)
-img
+hist(img) # hist look at colour frequency distrbution 
+img # display general stats about image 
 ```
 
-wakhdkdahdwhak
+```{r}
+# imgRt <- getFrame(img, 1)
+
+imgGbase <- channel(img, "green") # extracting green spectrum 
+imgRbase <- channel(img, "red")
+imgBbase <- channel(img, "blue")
+
+display(imgBbase, method="browser") # dispalying extracted spectrum - greyscale as only 1 colour channel 
+display(imgRbase, method="browser")
+display(imgGbase, method="browser")
+
+imgG <- rgbImage(red = 0 * imgRbase, green = imgGbase, blue = 0 * imgBbase) # coonverting image back to colour image
+imgR <- rgbImage(red = imgRbase, green = 0 * imgGbase, blue = 0 * imgBbase)
+imgB <- rgbImage(red = 0 * imgRbase, green = 0 * imgGbase, blue = imgBbase)
+
+display(imgB, method="browser") # displaying col image 
+display(imgRbase, method="browser")
+display(imgGbase, method="browser")
+
+display(img, method="browser")
+
+```
+
+investigating extracted colour channels 
+
+```{r}
+hist(imgGbase)
+imgGbase
+
+hist(imgRbase)
+imgRbase
+```
+
+thresholding
+
+```{r}
+Gth <- otsu(imgGbase)
+Gthresh <- imgGbase>Gth
+display(Gthresh, method="browser")
+
+plot(normalize(Gthresh),interpolate=F)
+```
+
