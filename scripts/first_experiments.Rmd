@@ -1,0 +1,29 @@
+---
+title: "first_experiments"
+author: "Drew"
+date: "2024-01-12"
+output: html_document
+---
+
+```{r}
+BiocManager::install("EBImage")
+```
+
+```{r}
+library(EBImage)
+```
+
+```{r}
+img <- readImage("data/trial.tif")
+```
+
+```{r}
+display(img, method="browser") # using browser method runs java script through web brower to view object 
+display(img, method="raster") # uses r's default method allows combo with other plotting functionality to add labels etc 
+```
+
+```{r}
+hist(img)
+img
+```
+
