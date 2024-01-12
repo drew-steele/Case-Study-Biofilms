@@ -16,7 +16,7 @@ library(EBImage)
 loading image in
 
 ```{r}
-img <- readImage("data/trial.tif")
+img <- readImage("data/trial2.tif")
 ```
 
 viewing image 
@@ -49,8 +49,8 @@ imgR <- rgbImage(red = imgRbase, green = 0 * imgGbase, blue = 0 * imgBbase)
 imgB <- rgbImage(red = 0 * imgRbase, green = 0 * imgGbase, blue = imgBbase)
 
 display(imgB, method="browser") # displaying col image 
-display(imgRbase, method="browser")
-display(imgGbase, method="browser")
+display(imgR, method="browser")
+display(imgG, method="browser")
 
 display(img, method="browser")
 
@@ -66,13 +66,85 @@ hist(imgRbase)
 imgRbase
 ```
 
+noise filtering 
+
+```{r}
+
+Gmfilt <- medianFilter(imgGbase, 3)
+
+display(imgGbase, method="browser")
+display(Gmfilt, method="browser")
+
+Ggfilt <- gblur(imgGbase, sigma = 5)
+
+display(imgGbase, method="browser")
+display(Ggfilt, method="browser")
+
+
+
+
+nfilt <- medianFilter(img, 3)
+
+display(nfilt, method="browser")
+display(img, method="browser")
+
+hist(img)
+
+```
+
+```{r}
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+
+Geimg=EBImage::filter2(gblur(imgGbase,sigma=1.5),k)
+display(Geimg, method="browser")
+
+Reimg=EBImage::filter2(gblur(imgRbase,sigma=1.5),k)
+display(Reimg, method="browser")
+```
+
+
 thresholding
 
 ```{r}
 Gth <- otsu(imgGbase)
-Gthresh <- imgGbase>Gth
+Gthresh <- imgGbase>0.5
 display(Gthresh, method="browser")
 
-plot(normalize(Gthresh),interpolate=F)
+Rth <- otsu(imgRbase)
+Rthresh <- imgRbase>0.5
+display(Rthresh, method="browser")
+
+```
+
+```{r}
+
+Gat_img=EBImage::thresh(imgGbase,h = 5,w = 5, offset = 0.10)
+
+display(Gat_img, method="browser")
+display(imgGbase, method="browser")
+
+Rat_img=EBImage::thresh(imgRbase,h = 5,w = 5, offset = 0.10)
+
+display(Rat_img, method="browser")
+display(imgRbase, method="browser")
+
+display(img, method="browser")
+```
+
+subtracting green channel from red channel - works pretty good, want to try using just each colour channel and massivley raising contrast? might be good to try 
+
+```{r}
+test <- imgRbase - imgGbase 
+
+
+display(test, method="browser")
+
+#Gth <- otsu(imgGbase)
+Gthresh <- test>0.08
+display(Gthresh, method="browser")
+
+display(img, method="browser")
 ```
 
