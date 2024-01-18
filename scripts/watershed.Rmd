@@ -22,13 +22,20 @@ increasing contrast and gamma
 
 ```{r}
 #imgB <- img - 0.1
-imgC <- img * 2
-imgG <- imgC ^ 2
+imgG <- (img * 1.5) ^ 1.5
+imgG = imgG[100:300, 100:300, 1:3]
+imgG <- (img * 2) ^ 1.2
+imgG2 = imgG2[100:300, 100:300, 1:3]
+
+plot(imgG)
+plot(imgG2)
 
 # display(imgB, method="browser")
 display(imgC, method="browser")
 display(imgG, method="browser")
 
+imgCr = img[100:300, 100:300, 1:3]
+plot(imgCr)
 imgG = imgG[100:300, 100:300, 1:3]
 plot(imgG)
 ```
@@ -40,16 +47,33 @@ sharpennign edges
 imgB <- img
 colorMode(imgB) = Grayscale
 
-nuc_gblur = gblur(imgC, sigma = 3)
+nuc_gblur = gblur(imgG, sigma = 1)
+plot(nuc_gblur)
 display(nuc_gblur, all=TRUE )
 
 
 fhi = matrix(1, nrow = 3, ncol = 3)
 fhi[2, 2] = -8
 
-img_fhi = filter2(imgB, fhi)
+img_fhi = filter2(imgG, k)
+plot(img_fhi)
+
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+Geimg=EBImage::filter2(gblur(imgG,sigma=1),k)
+display(Geimg, method="browser")
 
 display(img_fhi)
+
+nfilt <- medianFilter(imgG, 3) # shit
+plot(nfilt)
+
+imgB <- imgG
+colorMode(imgB) = Grayscale
+Gth <- otsu(imgB) # not working 
+Gthresh <- imgGbase > Gth 
+display(Gthresh, method="browser")
 
 ```
 
@@ -69,24 +93,42 @@ display(img3, method="browser")
 ```
 
 
+```{r}
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+Geimg = EBImage::filter2(gblur(imgG,sigma=1),k)
+
+test <- Geimg * 2 
+
+par(mfrow = c(1,2))
+plot(test)
+plot(imgG)
+
+
+test <- Geimg * 2
+plot(test)
+```
+
+
 ### thresholding
 
 using thresh function which creates little box and adaptivley thresholds across image so accounts for varying frequency across image 
 
 ```{r}
 
-colorMode(imgG) = Grayscale
+colorMode(test) = Grayscale
 imgG
 
-display(thresh(imgG, w=10, h=10, offset=0.025), all=TRUE )
+display(thresh(test, w=10, h=10, offset=0.025), all=TRUE )
 
-ATimg1 <- thresh(imgG, w=5, h=5, offset=0.1)
+ATimg1 <- thresh(test, w=5, h=5, offset=0.1)
 ATimg0.5 <- thresh(imgG, w=5, h=5, offset=0.05)
 ATimg0.25 <- thresh(imgG, w=5, h=5, offset=0.025)
 
 par(mfrow = c(2,2))
-plot(img)
-plot(ATimg1)
+plot(imgG, all = T)
+plot(ATimg1, all = T)
 plot(ATimg0.5)
 plot(ATimg0.25)
 
@@ -114,10 +156,10 @@ plot(img2)
 ```
 
 ```{r}
-nmask = watershed( distmap(ATimg0.25), tolerance = 1, ext = 1)
+nmask = watershed( distmap(ATimg1), tolerance = 1, ext = 1)
 display(colorLabels(nmask), all=TRUE)
 
-par(mfrow = c(2,1))
+par(mfrow = c(1,2))
 plot(imgG)
 plot(colorLabels(nmask))
 ```
