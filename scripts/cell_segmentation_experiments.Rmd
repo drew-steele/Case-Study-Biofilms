@@ -20,7 +20,7 @@ display(img, method="browser")
 cropping 
 
 ```{r}
-imgCr = img[100:300, 100:300, 1:3]
+imgCr = img[100:355, 100:355, 1:3]
 
 plot(imgCr)
 
@@ -37,6 +37,10 @@ plot(imgG)
 offset subtraction 
 
 ```{r}
+
+par(mfrow = c(1,2))
+plot(imgR[110:120, 82:92]*2)
+plot(imgG[110:120, 82:92]*2)
 
 osR=mean(imgR[110:120, 82:92])
 osG=mean(imgG[110:120, 82:92])
@@ -131,9 +135,136 @@ plot(normalize(imgGe2))
 
 ```
 
-thresholding 
+thresholding - ostu 
+unable to get this working but not sure if good anyway as not a biomodal distribution 
 
 ```{r}
 
+max(imgGo)
+min(imgGo)
+
+otsu(imgGo, range = c(-0.1260736, 0.7520985), levels = 255)
+
+par(mfrow = c(1,1))
+par(mar = c(3,3,3,3))
+hist(imgGo)
+
 ```
 
+adaptive thresholding - OG image 
+
+```{r}
+
+imgRat1 <- thresh(imgRo, w=5, h=5, offset=0.1)
+imgRat2 <- thresh(imgRo, w=5, h=5, offset=0.05)
+imgRat3 <- thresh(imgRo, w=5, h=5, offset=0.025)
+
+par(mfrow = c(2,2))
+plot(imgRat1)
+plot(imgRat2)
+plot(imgRat3)
+plot(imgCr * 2)
+
+
+imgGat1 <- thresh(imgGo, w=5, h=5, offset=0.1)
+imgGat2 <- thresh(imgGo, w=5, h=5, offset=0.05)
+imgGat3 <- thresh(imgGo, w=5, h=5, offset=0.025)
+
+par(mfrow = c(2,2))
+plot(imgGat1)
+plot(imgGat2)
+plot(imgGat3)
+plot(imgCr * 2)
+```
+
+adaptive thresholding - Edge1 image 
+
+```{r}
+
+imgRat1e <- thresh(imgRe, w=5, h=5, offset=0.1)
+imgRat2e <- thresh(imgRe, w=5, h=5, offset=0.05)
+imgRat3e <- thresh(imgRe, w=5, h=5, offset=0.025)
+
+par(mfrow = c(2,2))
+plot(imgRat1e)
+plot(imgRat2e)
+plot(imgRat3e)
+plot(imgCr * 2)
+
+
+imgGat1e <- thresh(imgGe, w=5, h=5, offset=0.1)
+imgGat2e <- thresh(imgGe, w=5, h=5, offset=0.05)
+imgGat3e <- thresh(imgGe, w=5, h=5, offset=0.025)
+
+par(mfrow = c(2,2))
+plot(imgGat1e)
+plot(imgGat2e)
+plot(imgGat3e)
+plot(imgCr * 2)
+
+imgGate <- fillHull(imgGat3e)
+plot(imgGate)
+
+```
+
+adaptive thresholding - Edge2 image 
+
+```{r}
+
+imgRat1e2 <- thresh(imgRe2, w=5, h=5, offset=0.1)
+imgRat2e2 <- thresh(imgRe2, w=5, h=5, offset=0.05)
+imgRat3e2 <- thresh(imgRe2, w=5, h=5, offset=0.025)
+
+par(mfrow = c(2,2))
+plot(imgRat1e2)
+plot(imgRat2e2)
+plot(imgRat3e2)
+plot(imgCr * 2)
+
+
+imgGat1e2 <- thresh(imgGe2, w=5, h=5, offset=0.1)
+imgGat2e2 <- thresh(imgGe2, w=5, h=5, offset=0.05)
+imgGat3e2 <- thresh(imgGe2, w=5, h=5, offset=0.025)
+
+par(mfrow = c(2,2))
+plot(imgGat1e2)
+plot(imgGat2e2)
+plot(imgGat3e2)
+plot(imgCr * 2)
+```
+
+reviewing thresholding methods
+
+```{r}
+
+par(mfrow = c(2,2))
+plot(imgRat3e2)
+plot(imgRat3e)
+plot(imgRat3)
+plot(imgCr * 2)
+
+par(mfrow = c(2,2))
+plot(imgGat3e2)
+plot(imgGat3e)
+plot(imgGat3)
+plot(imgCr * 2)
+
+```
+
+watershed
+
+```{r}
+nmaske2 <- watershed(distmap(imgGat3e2), tolerance = 1, ext = 1)
+nmask <- watershed(distmap(imgGat3), tolerance = 1, ext = 1)
+nmaske <- watershed(distmap(imgGat3e), tolerance = 1, ext = 1)
+
+par(mfrow = c(2,2))
+plot(colorLabels(nmask))
+plot(colorLabels(nmaske))
+plot(colorLabels(nmaske2))
+plot(imgCr * 2)
+
+nmask
+
+#display(colorLabels(nmaske2), all=TRUE)
+```
