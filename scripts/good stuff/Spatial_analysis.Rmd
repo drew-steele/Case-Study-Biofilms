@@ -1,0 +1,56 @@
+---
+title: "Spatial_analysis"
+author: "Drew"
+date: "2024-02-05"
+output: html_document
+---
+
+```{r}
+install.packages("spatstat", repos = "https://www.stats.bris.ac.uk/R/")
+```
+
+```{r}
+#library(EBImage)
+library(spatstat)
+```
+
+```{r}
+#img <- readImage("results/img.tiff")
+red <- read.csv("results/redcells.csv")
+green <- read.csv("results/greencells.csv")
+```
+
+```{r}
+red <- red[,2:3]
+red[,3] <- "dead"
+
+green <- green[,2:3]
+green[,3] <- "live"
+ 
+allcells <- rbind(red, green)
+colnames(allcells) <- c("x", "y", "condition")
+
+min(allcells$x)
+min(allcells$y)
+max(allcells$x)
+max(allcells$y)
+```
+
+```{r}
+myPattern <- ppp(allcells[,1], allcells[,2], c(0,513), c(0,513))
+marks(myPattern) <- allcells[,3]
+```
+
+```{r}
+plot(myPattern)
+summary(myPattern)
+plot(Kest(myPattern))
+plot(density(myPattern))
+plot(smooth(myPattern))
+```
+
+```{r}
+radius <- 0.1
+n_neighbors <- nncross(myPattern, k = 0, r = radius, by = "marks")
+```
+
