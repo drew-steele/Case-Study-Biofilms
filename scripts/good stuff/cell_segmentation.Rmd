@@ -1,0 +1,200 @@
+---
+title: "cell_segmentation"
+author: "Drew"
+date: "2024-02-05"
+output: html_document
+---
+
+```{r}
+library(EBImage)
+```
+
+```{r}
+img <- readImage("data/trial2.tif")
+imgCr <- img
+```
+
+```{r}
+display(img, method="browser")
+```
+
+cropping 
+
+```{r}
+imgCr = img[512:1024, 1:512, 1:3]
+
+imgR <- getFrame(imgCr, 1)
+imgG <- getFrame(imgCr, 2)
+
+par(mfrow = c(1,3))
+plot(imgR)
+plot(imgG)
+plot(imgCr)
+
+```
+
+offset subtraction 
+
+```{r}
+
+par(mfrow = c(1,2))
+plot(imgG[436:463, 325:360]*4)
+plot(imgR[436:463, 325:360]*4)
+
+osR=mean(imgR[436:463, 325:360])
+osG=mean(imgG[436:463, 325:360])
+
+imgRo <- imgR - osR
+imgGo <- imgG - osG
+
+par(mfrow = c(2,2))
+plot(imgR)
+plot(imgRo)
+plot(imgG)
+plot(imgGo)
+```
+
+making red bolder 
+
+```{r}
+imgRb <- imgRo - imgGo /1.8
+
+par(mfrow = c(2,1))
+plot(imgRb)
+plot(imgCr)
+```
+
+tesing green subtractions 
+
+```{r}
+imgGb <- imgGo - imgRo / 1
+#imgGb2 <- imgGo - thRb1
+
+par(mfrow = c(1,2))
+#plot(imgGb2)
+plot(imgGb)
+plot(imgCr)
+
+```
+
+
+edge detection - red only 
+
+```{r}
+
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+
+imgRbe <- EBImage::filter2(gblur(imgRb,sigma=1.5),k)
+par(mfrow = c(1,2))
+plot(imgCr)
+plot(normalize(imgRbe))
+```
+
+edge detection - green
+
+```{r}
+
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+
+imgGbe <- EBImage::filter2(gblur(imgGb,sigma=1.5),k)
+par(mfrow = c(1,2))
+plot(imgCr)
+plot(normalize(imgGbe))
+```
+
+
+adaptive thresh - red 
+
+```{r}
+thRb1 <- thresh(imgRbe, w=5, h=5, offset=0.04)
+thRb2 <- thresh(imgRbe, w=5, h=5, offset=0.036)
+thRb3 <- thresh(imgRbe, w=5, h=5, offset=0.033)
+
+par(mfrow = c(1,3))
+plot(imgRb)
+plot(thRb1)
+plot(imgCr *2)
+
+par(mfrow = c(1,3))
+plot(imgRb)
+plot(thRb2)
+plot(imgCr *2)
+
+par(mfrow = c(1,3))
+plot(imgRb)
+plot(thRb3)
+plot(imgCr *2)
+
+```
+
+adaptive thresh - green 
+
+```{r}
+thGb1 <- thresh(imgGbe, w=5, h=5, offset=0.03)
+thGb2 <- thresh(imgGbe, w=5, h=5, offset=0.025)
+thGb3 <- thresh(imgGbe, w=5, h=5, offset=0.02)
+
+par(mfrow = c(1,3))
+plot(imgGb)
+plot(thGb1)
+plot(imgCr *2)
+
+par(mfrow = c(1,3))
+plot(imgGb)
+plot(thGb2)
+plot(imgCr *2)
+
+par(mfrow = c(1,3))
+plot(imgGb)
+plot(thGb3)
+plot(imgCr *2)
+
+```
+
+giving unique label to each cell 
+
+```{r}
+
+Rlab <- bwlabel(thRb1)
+Glab <- bwlabel(thGb2)
+
+RedCells <- as.data.frame(computeFeatures.moment(Rlab))
+GreenCells <- as.data.frame(computeFeatures.moment(Glab))
+
+```
+
+creating function to overlay plot points on og image 
+
+```{r}
+plotontop <- function(img, red, green) {
+  
+  x <- flip(img *2)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp =1)
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = red$m.cx / dim(x)[1], y = red$m.cy / dim(x)[1], col = "red", pch = 1)
+  points(x = green$m.cx / dim(x)[1], y = green$m.cy / dim(x)[1], col = "blue", pch = 1)
+  
+}
+```
+
+plotting red and green extracted points on image 
+
+```{r}
+par(mfrow = c(1,1))
+
+plotontop(imgCr, RedCells, GreenCells)
+```
+
+```{r}
+writeImage(imgCr, file = "results/img.tiff", type = "tiff")
+write.csv(RedCells, file = "results/redcells.csv")
+write.csv(GreenCells, file = "results/greencells.csv")
+```
+
