@@ -202,11 +202,9 @@ min(NN_all$NN_dist)
 max(NN_all$NN_dist)
 hist(NN_all$NN_dist)
 
-dups <- NN_all[NN_all$NN_dist < 1 ,]
-
 ```
 
-
+extracting cell data form pointpattern object
 
 ```{r}
 x <- as.numeric(pat$x)
@@ -218,6 +216,8 @@ test <- cbind(test, m)
 str(test)
 ```
 
+combining cell coords with distance - removing close points 
+
 ```{r}
 dups_cells <- cbind(test, NN_all)
 
@@ -227,6 +227,9 @@ str(livingcells)
 
 ```
 
+```{r}
+redOG <- read.csv("data/test/redPAA48.csv")
+```
 
 ```{r}
 plotontop2 <- function(img, green, red) {
@@ -243,8 +246,50 @@ plotontop2 <- function(img, green, red) {
 }
 ```
 
+exaimining success 
 
 ```{r}
 plotontop2(imgCr, livingcells, red_cells)
+```
+
+### calculating neighbours in x distance 
+
+data prep 
+
+```{r}
+live <- livingcells[,1:2]
+live[,3] <- 1
+colnames(live) <- c("x", "y", "condition")
+
+dead <- red_cells[,2:3]
+dead[,3] <- 0
+colnames(dead) <- c("x", "y", "condition")
+
+fullcells <- rbind(live, dead)
+```
+
+point pattern object 
+
+```{r}
+pat_new <- ppp(fullcells[,1], fullcells[,2], c(0,513), c(0,513)) # creating point pattaern object 
+marks(pat_new) <- fullcells[,3] # adding infor on live dead - any extra info refered to as mark in spatstat
+anyDuplicated(pat_new) # checking for duplicated poitns 
+```
+
+extracting how many living and how many dead neighbours in certain radius 
+
+```{r}
+
+countAliveDeadNeighbors <- function(x) {
+  alive_count <- sum(x == 1)
+  dead_count <- sum(x == 0)
+  
+  return(c(alive = alive_count, dead = dead_count))
+}
+
+neighboursInfo <- markstat(pat_new, countAliveDeadNeighbors, R = 15)
+
+donemaybe <- t(neighboursInfo)
+
 ```
 
