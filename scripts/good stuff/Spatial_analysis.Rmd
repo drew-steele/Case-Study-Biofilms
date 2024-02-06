@@ -7,12 +7,123 @@ output: html_document
 
 ```{r}
 install.packages("spatstat", repos = "https://www.stats.bris.ac.uk/R/")
+install.packages("nortest", repos = "https://www.stats.bris.ac.uk/R/")
 ```
 
 ```{r}
 #library(EBImage)
 library(spatstat)
 ```
+
+```{r}
+
+living <- read.csv("results/livingCellsLoc.csv")
+dead <- read.csv("results/deadCellsLoc.csv")
+
+```
+
+data prep 
+
+```{r}
+living <- living[, c("m.cx", "m.cy")]
+living[,"condition"] <- 1
+
+dead <- dead[, c("m.cx", "m.cy")]
+dead[,"condition"] <- 0
+
+fullcells <- rbind(living, dead)
+```
+
+point pattern object 
+
+```{r}
+pat <- ppp(fullcells[,1], fullcells[,2], c(0,1024), c(0,512)) # creating point pattaern object 
+marks(pat) <- fullcells[,3] # adding infor on live dead - any extra info refered to as mark in spatstat
+
+anyDuplicated(pat) # checking for duplicated poitns 
+plot(pat)
+```
+
+extracting how many living and how many dead neighbours in certain radius 
+
+```{r}
+
+NEcounts <- function(x) {
+  alive_count <- sum(x == 1)
+  dead_count <- sum(x == 0)
+  
+  return(c(aliveN = alive_count, deadN = dead_count))
+}
+
+neighboursInfo <- t(markstat(pat, NEcounts, R = 20))
+
+```
+
+extracting distance to closet neighbour 
+
+```{r}
+
+NNdist <- nndist(pat)
+
+```
+
+
+creating data frame of output 
+
+```{r}
+
+cellInf <- cbind(fullcells, NNdist, neighboursInfo)
+
+deadInf <- cellInf[cellInf$condition == 0 ,]
+deadInf[, "sumN"] <- deadInf[, "aliveN"] + deadInf[, "deadN"]
+
+livingInf <- cellInf[cellInf$condition == 1 ,]
+livingInf[, "sumN"] <- livingInf[, "aliveN"] + livingInf[, "deadN"]
+
+```
+
+exploring output
+
+```{r}
+
+library(nortest)
+
+mean(livingInf$sumN)
+mean(deadInf$sumN)
+
+mean(livingInf$NNdist)
+mean(deadInf$NNdist)
+
+hist(livingInf$sumN)
+qqnorm(livingInf$sumN)
+qqline(livingInf$sumN)
+ad.test(livingInf$sumN)
+
+hist(deadInf$sumN)
+qqnorm(deadInf$sumN)
+qqline(deadInf$sumN)
+ad.test(deadInf$sumN)
+shapiro.test(deadInf$sumN)
+
+hist(livingInf$NNdist)
+qqnorm(livingInf$NNdist)
+qqline(livingInf$NNdist)
+ad.test(livingInf$NNdist)
+
+hist(deadInf$NNdist)
+qqnorm(deadInf$NNdist)
+qqline(deadInf$NNdist)
+ad.test(deadInf$NNdist)
+shapiro.test(deadInf$NNdist)
+
+```
+
+
+
+
+
+
+
 
 ```{r}
 #img <- readImage("results/img.tiff")
@@ -36,10 +147,21 @@ max(allcells$x)
 max(allcells$y)
 ```
 
+creating spatstat point pattern object 
+
 ```{r}
-myPattern <- ppp(allcells[,1], allcells[,2], c(0,513), c(0,513))
-marks(myPattern) <- allcells[,3]
+pat <- ppp(allcells[,1], allcells[,2], c(0,513), c(0,513)) # creating point pattaern object 
+marks(pat) <- allcells[,3] # adding infor on live dead - any extra info refered to as mark in spatstat
+anyDuplicated(pat) # checking for duplicated poitns 
 ```
+
+general descriptive statistics
+
+```{r}
+# global_density <- length(bike_theft_2019$NAME)/sum(st_area(london_ward_shp))
+```
+
+
 
 ```{r}
 plot(myPattern)
@@ -54,3 +176,26 @@ radius <- 0.1
 n_neighbors <- nncross(myPattern, k = 0, r = radius, by = "marks")
 ```
 
+```{r}
+radius <- 2  # replace with your desired radius
+neighbors <- nncross(allcells$x, allcells$y, r = radius)
+```
+
+```{r}
+W <- square(1)
+set.seed(42)
+Y <- runifpoint(2000) # Random points in the unit square
+plot(Y, main = "Random points in unit square")
+```
+
+```{r}
+xy <- gridcenters(W, 513, 513) # Grid of points in the unit square
+X <- ppp(xy$x, xy$y, window = W, check = FALSE, checkdup = FALSE)
+plot(X)
+```
+
+```{r}
+test <- crosspaircounts(myPattern, X, r = 0.5)
+```
+
+could also exract info such as of the 10 neareast neighbours, how many are dead and how many are alive 
