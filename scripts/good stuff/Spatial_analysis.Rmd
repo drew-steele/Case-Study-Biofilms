@@ -6,8 +6,8 @@ output: html_document
 ---
 
 ```{r}
-install.packages("spatstat", repos = "https://www.stats.bris.ac.uk/R/")
-install.packages("nortest", repos = "https://www.stats.bris.ac.uk/R/")
+#install.packages("spatstat", repos = "https://www.stats.bris.ac.uk/R/")
+#install.packages("nortest", repos = "https://www.stats.bris.ac.uk/R/")
 ```
 
 ```{r}
@@ -117,6 +117,36 @@ ad.test(deadInf$NNdist)
 shapiro.test(deadInf$NNdist)
 
 ```
+
+saving outputs 
+
+```{r}
+
+write.csv(deadInf, "results/deadInf.csv")
+write.csv(livingInf, "results/livingInf.csv")
+
+```
+
+```{r}
+test <- nndist(pat, k = 1:3)
+k3dists <- cbind(fullcells, test) 
+str(k3dists)
+k3dists[,"meanDist"] <- rowMeans(k3dists[, 4:6], na.rm = TRUE)
+k3dists[,"sumDist"] <- rowSums(k3dists[, 4:6], na.rm = TRUE)
+
+livetest <- k3dists[k3dists$condition == "1" ,]
+deadtest <- k3dists[k3dists$condition == "0" ,]
+
+mean(livetest$sumDist)
+mean(deadtest$sumDist)
+
+mean(livetest$meanDist)
+mean(deadtest$meanDist)
+```
+
+
+
+
 
 
 
