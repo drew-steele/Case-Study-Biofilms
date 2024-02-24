@@ -7,6 +7,7 @@ output: html_document
 
 ```{r}
 library(EBImage)
+library(spatstat)
 ```
 
 defining functions 
@@ -25,23 +26,35 @@ plotontop <- function(img, cells, red, xcord, ycord) {
 }
 ```
 
+defining variable names 
+
+```{r}
+inputDir <- "data/1344_48h_Repeat Oct 2020"
+inputName <- "1344 20min H2O2 48hrs 1"
+outputName <- "1_H202_48_20_1"
+thGvalue <- 0.031
+thRvalue <- 0.045
+rRatioValue <- 1.8
+```
+
+defining which parts to run 
+
+```{r}
+thGloop <- "n"
+thRloop <- "n"
+rRatioLoop <- "n"
+```
+
 load original segmentation + image and view 
 
 ```{r}
-OGgreen <- read.csv("data/1344_48h_Repeat Oct 2020/1344 60min PAA 48hrs 1.green.csv")
-OGred <- read.csv("data/1344_48h_Repeat Oct 2020/1344 60min PAA 48hrs 1.red.csv")
+OGgreen <- read.csv(paste0(inputDir, "/", inputName, ".green.csv"))
+OGred <- read.csv(paste0(inputDir, "/", inputName, ".red.csv"))
 
-img <- readImage("data/PAA1.tif")
-display(img, method="browser")
+img <- readImage(paste0(inputDir, "/", inputName, ".tif"))
+# display(img *2, method="browser")
 ```
 
-
-
-defining output name 
-
-```{r}
-outputName <- "1_PAA_48_60_1"
-```
 
 split colour channels 
 
@@ -62,11 +75,11 @@ offset subtraction - cropped
 ```{r}
 
 par(mfrow = c(1,2))
-plot(imgG[463:483, 400:420]*4) # examining offset area 
-plot(imgR[463:483, 400:420]*4)
+plot(imgG[297:317, 113:133]*4) # examining offset area 
+plot(imgR[297:317, 113:133]*4)
 
-osR=mean(imgR[463:483, 400:420]) # taking mean inensity of area 
-osG=mean(imgG[463:483, 400:420])
+osR=mean(imgR[297:317, 113:133]) # taking mean inensity of area 
+osG=mean(imgG[297:317, 113:133])
 
 imgRo <- imgR - osR # subtracting mean intensity from full image 
 imgGo <- imgG - osG
@@ -81,6 +94,8 @@ plot(imgGo)
 explore image 
 
 ```{r}
+
+par(mar = c(5,5,5,5))
 
 hist(img)
 img
@@ -114,16 +129,21 @@ adaptive thresholding - exploring offset
 
 ```{r}
 
-for (i in seq(from = 0.025, to = 0.5, by = 0.025)) {
+if(thGloop == "y") {
   
-  x <- thresh(imgGe, w=5, h=5, offset= i)
+  for (i in seq(from = 0.015, to = 0.3, by = 0.015)) {
   
-  par(mfrow = c(2,1))
-  display(x, method="raster")
-  text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
-  display(img * 2, method="raster")
-  text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+    x <- thresh(imgGe, w=5, h=5, offset= i)
   
+    par(mfrow = c(2,1))
+    display(x, method="raster")
+    text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
+    display(img * 2, method="raster")
+    text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+  
+  }
+} else {
+  cat("green threshold loop not run")
 }
 
 ```
@@ -132,19 +152,7 @@ selecting best method
 
 ```{r}
 
-for (i in c(0.02, 0.025, 0.03)) {
-  
-  x <- thresh(imgGe, w=5, h=5, offset= i)
-  
-  par(mfrow = c(2,1))
-  display(x, method="raster")
-  text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
-  display(img * 2, method="raster")
-  text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
-  
-}
-
-imgGth <- thresh(imgGe, w=5, h=5, offset= 0.025)
+imgGth <- thresh(imgGe, w=5, h=5, offset = thGvalue)
 plot(imgGth)
 
 ```
@@ -153,9 +161,9 @@ watershed algorithm
 
 ```{r}
 
-nmaskG <- watershed(distmap(imgGth), tolerance = 1, ext = 1)
+nmaskG <- watershed(EBImage::distmap(imgGth), tolerance = 1, ext = 1)
 
-display(colorLabels(nmaskG), all=TRUE)
+#display(colorLabels(nmaskG), all=TRUE)
 
 par(mfrow = c(2,1))
 plot(colorLabels(nmaskG))
@@ -169,19 +177,24 @@ highlighting red cells - explorign values
 
 ```{r}
 
-for (i in seq(from = 1, to = 3, by = 0.1 )) {
+if(rRatioLoop == "y") {
+  
+  for (i in seq(from = 1, to = 3, by = 0.1 )) {
 
-  x <- imgRo - (imgGo / i)
+    x <- imgRo - (imgGo / i)
 
-  par(mfrow = c(2,1))
-  display(x * 2, method="raster")
-  text(x = 20, y = 20, label = paste("ratio = ", i), adj = c(0,1), col = "green", cex = 1.5)
-  display(img * 2, method="raster")
-  text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+    par(mfrow = c(2,1))
+    display(x * 2, method="raster")
+    text(x = 20, y = 20, label = paste("ratio = ", i), adj = c(0,1), col = "green", cex = 1.5)
+    display(img * 2, method="raster")
+    text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
 
+  }
+} else {
+  cat("red ratio loop not run")
 }
 
-imgRb <- imgRo - (imgGo / 3.5)
+imgRb <- imgRo - (imgGo / rRatioValue)
 
 ```
 
@@ -204,16 +217,21 @@ adaptive thresholding - exploring offset
 
 ```{r}
 
-for (i in seq(from = 0.025, to = 0.4, by = 0.025)) {
+if(thRloop == "y") {
   
-  x <- thresh(imgRe, w=5, h=5, offset= i)
+  for (i in seq(from = 0.015, to = 0.3, by = 0.015)) {
   
-  par(mfrow = c(2,1))
-  display(x, method="raster")
-  text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
-  display(img * 2, method="raster")
-  text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+    x <- thresh(imgRe, w=5, h=5, offset= i)
   
+    par(mfrow = c(2,1))
+    display(x, method="raster")
+    text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
+    display(img * 2, method="raster")
+    text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+  
+  }
+} else {
+  cat("red threshold loop not run")
 }
 
 ```
@@ -222,7 +240,7 @@ adaptive thresholding - selecting best method
 
 ```{r}
 
-imgRth <- thresh(imgRe, w=5, h=5, offset= 0.025)
+imgRth <- thresh(imgRe, w=5, h=5, offset= thRvalue)
 plot(imgRth)
 
 ```
@@ -231,11 +249,11 @@ watershed
 
 ```{r}
 
-nmaskR <- watershed(distmap(imgRth), tolerance = 1, ext = 1)
+nmaskR <- watershed(EBImage::distmap(imgRth), tolerance = 1, ext = 1)
 
 #nmaskR <- bwlabel(imgRth)
 
-display(colorLabels(nmaskR), all=TRUE)
+#display(colorLabels(nmaskR), all=TRUE)
 
 par(mfrow = c(2,1))
 plot(colorLabels(nmaskR))
@@ -269,10 +287,6 @@ plotontop(img, OGgreen, OGred, "XM", "YM")
 ```
 
 ### removing duplicated cells 
-
-```{r}
-library(spatstat)
-```
 
 manipulating data
 
