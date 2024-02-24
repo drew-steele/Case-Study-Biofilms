@@ -1,0 +1,357 @@
+---
+title: "cell_segmentation_script"
+author: "Drew"
+date: "2024-02-24"
+output: html_document
+---
+
+```{r}
+library(EBImage)
+```
+
+defining functions 
+
+```{r}
+plotontop <- function(img, cells, red, xcord, ycord) {
+  
+  x <- flip(img *2)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp =1)
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = cells[,xcord] / dim(x)[1], y = cells[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 1)
+  points(x = red[,xcord] / dim(x)[1], y = red[,ycord] / dim(x)[1], col = "red", pch = 1, cex = 1)
+}
+```
+
+load original segmentation + image and view 
+
+```{r}
+OGgreen <- read.csv("data/1344_48h_Repeat Oct 2020/1344 60min PAA 48hrs 1.green.csv")
+OGred <- read.csv("data/1344_48h_Repeat Oct 2020/1344 60min PAA 48hrs 1.red.csv")
+
+img <- readImage("data/PAA1.tif")
+display(img, method="browser")
+```
+
+
+
+defining output name 
+
+```{r}
+outputName <- "1_PAA_48_60_1"
+```
+
+split colour channels 
+
+```{r}
+
+imgR <- getFrame(img, 1)
+imgG <- getFrame(img, 2)
+
+par(mfrow = c(3,1))
+plot(imgR)
+plot(imgG)
+plot(img)
+
+```
+
+offset subtraction - cropped 
+
+```{r}
+
+par(mfrow = c(1,2))
+plot(imgG[463:483, 400:420]*4) # examining offset area 
+plot(imgR[463:483, 400:420]*4)
+
+osR=mean(imgR[463:483, 400:420]) # taking mean inensity of area 
+osG=mean(imgG[463:483, 400:420])
+
+imgRo <- imgR - osR # subtracting mean intensity from full image 
+imgGo <- imgG - osG
+
+par(mfrow = c(2,2))
+plot(imgR)
+plot(imgRo)
+plot(imgG)
+plot(imgGo)
+```
+
+explore image 
+
+```{r}
+
+hist(img)
+img
+
+hist(imgRo)
+imgRo
+
+hist(imgGo)
+imgGo
+
+```
+
+### segmenting live cells 
+
+edge detection
+
+```{r}
+
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+
+imgGe <- EBImage::filter2(gblur(imgGo,sigma=1.5),k)
+par(mfrow = c(2,1))
+plot(img)
+plot(normalize(imgGe))
+
+```
+
+adaptive thresholding - exploring offset 
+
+```{r}
+
+for (i in seq(from = 0.025, to = 0.5, by = 0.025)) {
+  
+  x <- thresh(imgGe, w=5, h=5, offset= i)
+  
+  par(mfrow = c(2,1))
+  display(x, method="raster")
+  text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
+  display(img * 2, method="raster")
+  text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+  
+}
+
+```
+
+selecting best method 
+
+```{r}
+
+for (i in c(0.02, 0.025, 0.03)) {
+  
+  x <- thresh(imgGe, w=5, h=5, offset= i)
+  
+  par(mfrow = c(2,1))
+  display(x, method="raster")
+  text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
+  display(img * 2, method="raster")
+  text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+  
+}
+
+imgGth <- thresh(imgGe, w=5, h=5, offset= 0.025)
+plot(imgGth)
+
+```
+
+watershed algorithm 
+
+```{r}
+
+nmaskG <- watershed(distmap(imgGth), tolerance = 1, ext = 1)
+
+display(colorLabels(nmaskG), all=TRUE)
+
+par(mfrow = c(2,1))
+plot(colorLabels(nmaskG))
+plot(img * 2)
+
+```
+
+### extracting red cells 
+
+highlighting red cells - explorign values 
+
+```{r}
+
+for (i in seq(from = 1, to = 3, by = 0.1 )) {
+
+  x <- imgRo - (imgGo / i)
+
+  par(mfrow = c(2,1))
+  display(x * 2, method="raster")
+  text(x = 20, y = 20, label = paste("ratio = ", i), adj = c(0,1), col = "green", cex = 1.5)
+  display(img * 2, method="raster")
+  text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+
+}
+
+imgRb <- imgRo - (imgGo / 3.5)
+
+```
+
+edge detection - red only 
+
+```{r}
+
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+
+imgRe <- EBImage::filter2(gblur(imgRb,sigma=1.5),k)
+par(mfrow = c(2,1))
+plot(img)
+plot(normalize(imgRe))
+
+```
+
+adaptive thresholding - exploring offset 
+
+```{r}
+
+for (i in seq(from = 0.025, to = 0.4, by = 0.025)) {
+  
+  x <- thresh(imgRe, w=5, h=5, offset= i)
+  
+  par(mfrow = c(2,1))
+  display(x, method="raster")
+  text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
+  display(img * 2, method="raster")
+  text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+  
+}
+
+```
+
+adaptive thresholding - selecting best method 
+
+```{r}
+
+imgRth <- thresh(imgRe, w=5, h=5, offset= 0.025)
+plot(imgRth)
+
+```
+
+watershed
+
+```{r}
+
+nmaskR <- watershed(distmap(imgRth), tolerance = 1, ext = 1)
+
+#nmaskR <- bwlabel(imgRth)
+
+display(colorLabels(nmaskR), all=TRUE)
+
+par(mfrow = c(2,1))
+plot(colorLabels(nmaskR))
+plot(img * 2)
+
+```
+
+### inspection of segmentations so far
+
+saving outputs 
+
+```{r}
+cellLocR <- as.data.frame(computeFeatures.moment(nmaskR))
+cellLocG <- as.data.frame(computeFeatures.moment(nmaskG))
+```
+
+plotting segmentation
+
+```{r}
+par(mfrow = c(1,1))
+
+plotontop(img, cellLocG, cellLocR, "m.cx", "m.cy")
+```
+
+plotting original segmentation 
+
+```{r}
+par(mfrow = c(1,1))
+
+plotontop(img, OGgreen, OGred, "XM", "YM")
+```
+
+### removing duplicated cells 
+
+```{r}
+library(spatstat)
+```
+
+manipulating data
+
+```{r}
+dead <- cellLocR[,1:2]
+dead[,3] <- "0"
+
+living <- cellLocG[,1:2]
+living[,3] <- "1"
+ 
+cells <- rbind(dead, living)
+colnames(cells) <- c("m.cx", "m.cy", "condition")
+```
+
+calculating nearest neighbour and selecting those closet together 
+
+```{r}
+
+NN_which <- nnwhich(cells)
+NN_dist <- nndist(cells)
+
+NN_dist_live <- nndist(living)
+NN_dist_dead <- nndist(dead)
+
+NN_all <- as.data.frame(cbind(NN_which, NN_dist))
+
+```
+
+examining dist data
+
+```{r}
+par(mar = c(10,10,10,10))
+par(mfrow = c(1,1))
+
+min(NN_all$NN_dist)
+max(NN_all$NN_dist)
+hist(NN_all$NN_dist)
+
+min(NN_dist_live)
+max(NN_dist_live)
+hist(NN_dist_live)
+
+min(NN_dist_dead)
+max(NN_dist_dead)
+hist(NN_dist_dead)
+
+```
+
+combining cell coords with distance - removing close points 
+
+```{r}
+
+min(NN_dist_live) # checking smallest distance between all cells
+min(NN_dist_dead) # checking smallest distance between all cells
+
+cellDists <- cbind(cells, NN_all)
+
+cellLocLive <- as.data.frame(cellDists[cellDists$condition == "1" & cellDists$NN_dist > min(NN_dist_live),])
+
+```
+
+exaimining final segmentation 
+
+```{r}
+
+par(mfrow = c(1,1))
+
+plotontop(img, cellLocLive, cellLocR, "m.cx", "m.cy") # examining my segmentation 
+
+plotontop(img, OGgreen, OGred, "XM", "YM") # comparing to original 
+
+```
+
+### saving output 
+
+```{r}
+
+write.csv(cellLocLive, paste0("results/segmentation/Live_", outputName, ".csv"))
+write.csv(cellLocLive, paste0("results/segmentation/Dead_", outputName, ".csv"))
+
+```
+
