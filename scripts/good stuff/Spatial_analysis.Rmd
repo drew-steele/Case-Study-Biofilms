@@ -11,7 +11,6 @@ output: html_document
 ```
 
 ```{r}
-#library(EBImage)
 library(spatstat)
 ```
 
@@ -37,17 +36,95 @@ fullcells <- rbind(living, dead)
 point pattern object 
 
 ```{r}
+
 pat <- ppp(fullcells[,1], fullcells[,2], c(0,1024), c(0,512)) # creating point pattaern object 
 marks(pat) <- fullcells[,3] # adding infor on live dead - any extra info refered to as mark in spatstat
 
-anyDuplicated(pat) # checking for duplicated poitns 
-plot(pat)
+patDead <- ppp(dead[,1], dead[,2], c(0,1024), c(0,512)) # creating point pattaern object 
+
+patLive <- ppp(living[,1], living[,2], c(0,1024), c(0,512)) # creating point pattaern object 
+
 ```
 
-extracting how many living and how many dead neighbours in certain radius 
+exploring point pattern objects
 
 ```{r}
 
+plot(pat)
+anyDuplicated(pat) # checking for duplicated poitns 
+summary(pat)
+
+plot(patDead)
+anyDuplicated(patDead) 
+summary(patDead)
+
+plot(patLive)
+anyDuplicated(patLive)
+summary(patLive)
+
+```
+
+Spatial randomness test 
+
+```{r}
+QAll <- quadratcount(pat, nx = 20, ny = 10)
+plot(pat)
+plot(QAll, add = TRUE, cex = 1)
+
+quadrat.test(QAll, alternative="two.sided")
+quadrat.test(QAll, alternative="regular")
+quadrat.test(QAll, alternative="clustered")
+
+QDead <- quadratcount(patDead, nx = 20, ny = 10)
+plot(patDead)
+plot(QDead, add = TRUE, cex = 1)
+
+quadrat.test(QDead, alternative="two.sided")
+quadrat.test(QDead, alternative="regular")
+quadrat.test(QDead, alternative="clustered")
+
+QLive <- quadratcount(patLive, nx = 20, ny = 10)
+plot(patLive)
+plot(QLive, add = TRUE, cex = 1)
+
+quadrat.test(QLive, alternative="two.sided")
+quadrat.test(QLive, alternative="regular")
+quadrat.test(QLive, alternative="clustered")
+```
+
+density tests 
+
+```{r}
+denAll <- density(pat) # using default bandwidth 
+attr(denAll, "sigma") # shows what bandwidth defaulted to 
+plot(denAll, main = "All") #plotting intensities 
+
+denDead <- density(patDead)
+attr(denDead, "sigma")
+plot(denDead, main = "Dead")
+
+denLive <- density(patLive)
+attr(denLive, "sigma")
+plot(denLive, main = "Live")
+
+densityVal <- denAll[pat] # extracting intensity values for each point 
+```
+
+extracting distance data
+
+```{r}
+
+NNdist <- as.data.frame(nndist(pat, k = 1:3))
+NNdist[,"meanDist"] <- rowMeans(NNdist[, 1:3], na.rm = TRUE)
+NNdist[,"sumDist"] <- rowSums(NNdist[, 1:3], na.rm = TRUE)
+
+```
+
+extracting how many living and how many dead neighbours in certain radius
+
+```{r}
+
+# defining function to use in the marksat function 
 NEcounts <- function(x) {
   alive_count <- sum(x == 1)
   dead_count <- sum(x == 0)
@@ -55,32 +132,58 @@ NEcounts <- function(x) {
   return(c(aliveN = alive_count, deadN = dead_count))
 }
 
-neighboursInfo <- t(markstat(pat, NEcounts, R = 20))
+neighbourInf <- t(markstat(pat, NEcounts, R = 15))
 
 ```
-
-extracting distance to closet neighbour 
-
-```{r}
-
-NNdist <- nndist(pat)
-
-```
-
 
 creating data frame of output 
 
 ```{r}
 
-cellInf <- cbind(fullcells, NNdist, neighboursInfo)
+cellInf <- cbind(fullcells, densityVal, NNdist, neighbourInf)
 
 deadInf <- cellInf[cellInf$condition == 0 ,]
-deadInf[, "sumN"] <- deadInf[, "aliveN"] + deadInf[, "deadN"]
-
-livingInf <- cellInf[cellInf$condition == 1 ,]
-livingInf[, "sumN"] <- livingInf[, "aliveN"] + livingInf[, "deadN"]
+liveInf <- cellInf[cellInf$condition == 1 ,]
 
 ```
+
+exploring outputs 
+
+```{r}
+
+for (i in c("densityVal", "dist.1", "dist.2", "dist.3", "meanDist", "sumDist", "aliveN", "deadN")) {
+  
+  cat("Variable:", i, "\n")
+  
+  cat("Mean (Dead):", mean(deadInf[[i]]), "\n")
+  cat("Median (Dead):", median(deadInf[[i]]), "\n")
+
+  cat("Mean (Live):", mean(liveInf[[i]]), "\n")
+  cat("Median (Live):", median(liveInf[[i]]), "\n")
+
+  # Plot histograms
+  hist(deadInf[[i]], main = paste("Histogram (Dead) -", i), xlab = i, col = "lightblue", border = "black")
+  hist(liveInf[[i]], main = paste("Histogram (Live) -", i), xlab = i, col = "lightgreen", border = "black")
+
+  # Pause for user input (press Enter to continue)
+  cat("Press Enter to continue...")
+  invisible(readLines(n = 1))
+}
+
+
+```
+
+saving output 
+
+```{r}
+
+write.csv(deadInf, "results/deadInf.csv")
+write.csv(livingInf, "results/livingInf.csv")
+
+```
+
+
+
 
 exploring output
 
@@ -127,26 +230,27 @@ write.csv(livingInf, "results/livingInf.csv")
 
 ```
 
+
+
+
+extracting distance to closet neighbour 
+
 ```{r}
-test <- nndist(pat, k = 1:3)
-k3dists <- cbind(fullcells, test) 
+NNdist <- nndist(pat, k = 1:3)
+k3dists <- cbind(fullcells, NNdist) 
 str(k3dists)
 k3dists[,"meanDist"] <- rowMeans(k3dists[, 4:6], na.rm = TRUE)
 k3dists[,"sumDist"] <- rowSums(k3dists[, 4:6], na.rm = TRUE)
 
-livetest <- k3dists[k3dists$condition == "1" ,]
-deadtest <- k3dists[k3dists$condition == "0" ,]
+#livetest <- k3dists[k3dists$condition == "1" ,]
+#deadtest <- k3dists[k3dists$condition == "0" ,]
 
-mean(livetest$sumDist)
-mean(deadtest$sumDist)
+#mean(livetest$sumDist)
+#mean(deadtest$sumDist)
 
-mean(livetest$meanDist)
-mean(deadtest$meanDist)
+#mean(livetest$meanDist)
+#mean(deadtest$meanDist)
 ```
-
-
-
-
 
 
 
