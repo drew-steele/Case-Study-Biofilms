@@ -6,7 +6,8 @@ output: html_document
 ---
 
 ```{r}
-install.packages(c("randomForestSRC"), repos = "https://www.stats.bris.ac.uk/R/")
+#install.packages(c("randomForestSRC"), repos = "https://www.stats.bris.ac.uk/R/")
+#install.packages(c("imbalance"), repos = "https://www.stats.bris.ac.uk/R/")
 ```
 
 ```{r}
@@ -16,6 +17,7 @@ install.packages(c("randomForestSRC"), repos = "https://www.stats.bris.ac.uk/R/"
 library(randomForestSRC)
 library(caret)
 library(ROSE)
+library(imbalance)
 
 ```
 
@@ -50,7 +52,9 @@ sum(trainD$condition == 1)
 
 ```
 
-creating model 
+#### standard RF 
+
+creating model
 
 ```{r}
 
@@ -72,53 +76,170 @@ plot.subsample(somin)
 
 ```
 
-imbalanced model - RFQ
+#### imbalanced model - RFQ
+
+deaful options, testing with optomisation 
 
 ```{r}
 
-rfModRFQ <- imbalanced(condition ~ ., data = trainD)
-print(rfModRFQ)
-print(get.imbalanced.performance(rfModRFQ))
-print(get.imbalanced.optimize(rfModRFQ))
+set.seed(101)
 
-RFQimp <- subsample(rfModRFQ, verbose = T)
-
-vimpCIRFQ <- extract.subsample(RFQimp)$var.jk.sel.Z
-vimpCIRFQ
-
-plot.subsample(RFQimp)
-
-
-th.1 <- get.imbalanced.performance(rfModRFQ)["threshold"]
-
-predRFQ <- predict(rfModRFQ, testD)
-print(predRFQ)
-print(get.imbalanced.performance(predRFQ,thresh=th.1))
-print(get.imbalanced.performance(predRFQ, thresh=th.2))
-
-```
-
-```{r}
-
-## creating model 
+## running model
 
 rfModRFQ <- imbalanced(condition ~ ., data = trainD)
 
-print(rfModRFQ)
-print(get.imbalanced.performance(rfModRFQ))
-print(get.imbalanced.optimize(rfModRFQ))
-
-
-## evaluating model and usign prediction data 
-
+## (1) default threshold (2) directly optimized gmean threshold
 th.1 <- get.imbalanced.performance(rfModRFQ)["threshold"]
 th.2 <- get.imbalanced.optimize(rfModRFQ)["threshold"]
 
+## training performance
+cat("-------- train performance ---------\n")
+print(rfModRFQ)
+RFQeval <- as.data.frame(get.imbalanced.performance(rfModRFQ, thresh=th.1))
+  names(RFQeval) <- "train"
+RFQeval[,"train optimised"] <- get.imbalanced.performance(rfModRFQ, thresh=th.2)
+
+## test performance
+cat("-------- test performance ---------\n")
 predRFQ <- predict(rfModRFQ, testD)
 print(predRFQ)
-print(get.imbalanced.performance(predRFQ, thresh=th.1))
-print(get.imbalanced.performance(predRFQ, thresh=th.2))
+RFQeval[,"test"] <- get.imbalanced.performance(predRFQ, thresh=th.1)
+RFQeval[,"test optimised"] <- get.imbalanced.performance(predRFQ, thresh=th.2)
 
 ```
 
+evaluation of RFQ model with and without SMOTE sampling 
+
+```{r}
+
+newd.50 <- mwmote(trainD, numInstances = 50, classAttr = "condition")
+newd.500 <- mwmote(trainD, numInstances = 500, classAttr = "condition")
+
+o.with.50 <- imbalanced(condition ~ ., rbind(trainD, newd.50), importance = T) 
+o.with.500 <- imbalanced(condition ~ ., rbind(trainD, newd.500))
+o.without <- imbalanced(condition ~ ., trainD)
+
+print(predict(o.with.50, trainD))
+print(predict(o.with.500, trainD))
+print(predict(o.without, trainD))
+
+print(predict(o.with.50, testD))
+print(predict(o.with.500, testD))
+print(predict(o.without, testD))
+
+```
+
+
+```{r}
+plot(o.with.50)
+plot(o.with.50, plots.one.page = FALSE)
+vimp(o.with.50)
+
+somin <- subsample(o.with.50, verbose = T)
+
+vimpCI <- extract.subsample(somin)$var.jk.sel.Z
+vimpCI
+
+plot.subsample(somin)
+```
+
+```{r}
+
+set.seed(101)
+
+allCells$sumN <- allCells[,"aliveN"] + allCells[,"deadN"]
+
+#dataR <- allCells[, c(1:7, 12)] # takign relevant preductirs 
+#dataS <- allCells[, c(1:7, 13)]
+
+index <- createDataPartition(allCells$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainD <- allCells[index, ]
+testD <- allCells[-index, ]
+
+sum(trainD$condition == 0)
+sum(trainD$condition == 1)
+
+trainR <- trainD[, c(1:7, 12)]
+testR <- testD[, c(1:7, 12)]
+
+trainS <- trainD[, c(1:7, 13)]
+testS <- testD[, c(1:7, 13)]
+
+newd.50R <- mwmote(trainR, numInstances = 50, classAttr = "condition")
+newd.50S <- mwmote(trainS, numInstances = 50, classAttr = "condition")
+
+```
+
+```{r}
+
+RFQsS <- imbalanced(condition ~ ., rbind(trainS, newd.50S), importance = T) 
+RFQs <- imbalanced(condition ~ ., trainS, importance = T)
+
+RFQrS <- imbalanced(condition ~ ., rbind(trainR, newd.50R), importance = T) 
+RFQr <- imbalanced(condition ~ ., trainR, importance = T)
+
+```
+
+```{r}
+print(predict(RFQsS, trainS))
+print(predict(RFQsS, testS))
+
+print(predict(RFQs, trainS))
+print(predict(RFQs, testS))
+
+print(predict(RFQrS, trainR))
+print(predict(RFQrS, testR))
+
+print(predict(RFQr, trainR))
+print(predict(RFQr, testR))
+
+```
+
+```{r}
+plot(RFQsS)
+plot(RFQs)
+
+plot(RFQrS)
+plot(RFQr)
+```
+
+```{r}
+
+th.1sS <- get.imbalanced.performance(RFQsS)["threshold"]
+th.2sS <- get.imbalanced.optimize(RFQsS)["threshold"]
+
+RFQsS <- data.frame(train = get.imbalanced.performance(RFQsS, thresh = th.1),
+                        "train optimised" = get.imbalanced.performance(RFQsS, thresh = th.2),
+                        test = get.imbalanced.performance(pred, thresh = th.1),
+                        "test optimised" = get.imbalanced.performance(pred, thresh = th.2))
+```
+
+```{r}
+RFQsS.sub <- subsample(RFQsS, verbose = T)
+RFQsS.vimpCI <- extract.subsample(RFQsS.sub)$var.jk.sel.Z
+RFQsS.vimpCI
+
+
+RFQs.sub <- subsample(RFQs, verbose = T)
+RFQs.vimpCI <- extract.subsample(RFQs.sub)$var.jk.sel.Z
+RFQs.vimpCI
+
+
+RFQrS.sub <- subsample(RFQrS, verbose = T)
+RFQrS.vimpCI <- extract.subsample(RFQrS.sub)$var.jk.sel.Z
+RFQrS.vimpCI
+
+
+RFQr.sub <- subsample(RFQr, verbose = T)
+RFQr.vimpCI <- extract.subsample(RFQr.sub)$var.jk.sel.Z
+RFQr.vimpCI
+
+
+par(mfrow = c(2,2))
+plot.subsample(RFQsS.sub, main = "Sum smote")
+plot.subsample(RFQs.sub, main = "Sum" )
+plot.subsample(RFQrS.sub, main = "Ratio smote")
+plot.subsample(RFQr.sub, main = "Ratio")
+
+```
 
