@@ -1,0 +1,124 @@
+---
+title: "RandomForrestSRC"
+author: "Drew"
+date: "2024-02-27"
+output: html_document
+---
+
+```{r}
+install.packages(c("randomForestSRC"), repos = "https://www.stats.bris.ac.uk/R/")
+```
+
+```{r}
+
+#library(ggplot2)
+#library(gridExtra)
+library(randomForestSRC)
+library(caret)
+library(ROSE)
+
+```
+
+loading data
+
+```{r}
+
+dead <- read.csv("results/deadInf.csv")
+live <- read.csv("results/livingInf.csv")
+
+allCells <- rbind(live, dead)
+allCells$condition <- as.factor(allCells$condition)
+allCells$ratioN <- (allCells[, "aliveN"] +1) / (allCells[, "deadN"] +1)
+allCells <- allCells[,2:13]
+
+str(allCells)
+
+```
+
+splitting data 
+
+```{r}
+
+data <- allCells[, c(1:7, 12)] # takign relevant preductirs 
+
+index <- createDataPartition(data$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainD <- data[index, ]
+testD <- data[-index, ]
+
+sum(trainD$condition == 0)
+sum(trainD$condition == 1)
+
+```
+
+creating model 
+
+```{r}
+
+rfMod <- rfsrc(condition ~ ., data = trainD, perf.type = "brier")
+print(rfMod)
+
+```
+
+evaluation 
+
+```{r}
+
+somin <- subsample(rfMod, verbose = T)
+
+vimpCI <- extract.subsample(somin)$var.jk.sel.Z
+vimpCI
+
+plot.subsample(somin)
+
+```
+
+imbalanced model - RFQ
+
+```{r}
+
+rfModRFQ <- imbalanced(condition ~ ., data = trainD)
+print(rfModRFQ)
+print(get.imbalanced.performance(rfModRFQ))
+print(get.imbalanced.optimize(rfModRFQ))
+
+RFQimp <- subsample(rfModRFQ, verbose = T)
+
+vimpCIRFQ <- extract.subsample(RFQimp)$var.jk.sel.Z
+vimpCIRFQ
+
+plot.subsample(RFQimp)
+
+
+th.1 <- get.imbalanced.performance(rfModRFQ)["threshold"]
+
+predRFQ <- predict(rfModRFQ, testD)
+print(predRFQ)
+print(get.imbalanced.performance(predRFQ,thresh=th.1))
+print(get.imbalanced.performance(predRFQ, thresh=th.2))
+
+```
+
+```{r}
+
+## creating model 
+
+rfModRFQ <- imbalanced(condition ~ ., data = trainD)
+
+print(rfModRFQ)
+print(get.imbalanced.performance(rfModRFQ))
+print(get.imbalanced.optimize(rfModRFQ))
+
+
+## evaluating model and usign prediction data 
+
+th.1 <- get.imbalanced.performance(rfModRFQ)["threshold"]
+th.2 <- get.imbalanced.optimize(rfModRFQ)["threshold"]
+
+predRFQ <- predict(rfModRFQ, testD)
+print(predRFQ)
+print(get.imbalanced.performance(predRFQ, thresh=th.1))
+print(get.imbalanced.performance(predRFQ, thresh=th.2))
+
+```
+
+
