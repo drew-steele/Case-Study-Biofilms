@@ -30,19 +30,8 @@ defining variable names
 
 ```{r}
 inputDir <- "data/1344_48h_Repeat Oct 2020"
-inputName <- "1344 20min H2O2 48hrs 1"
-outputName <- "1_H202_48_20_1"
-thGvalue <- 0.031
-thRvalue <- 0.045
-rRatioValue <- 1.8
-```
-
-defining which parts to run 
-
-```{r}
-thGloop <- "n"
-thRloop <- "n"
-rRatioLoop <- "n"
+inputName <- "1344 40min PAA 48hrs 3"
+outputName <- "1_PAA_48_40_3"
 ```
 
 load original segmentation + image and view 
@@ -52,9 +41,26 @@ OGgreen <- read.csv(paste0(inputDir, "/", inputName, ".green.csv"))
 OGred <- read.csv(paste0(inputDir, "/", inputName, ".red.csv"))
 
 img <- readImage(paste0(inputDir, "/", inputName, ".tif"))
-# display(img *2, method="browser")
+display(flip(img *2), method="browser")
+display(img *2, method="browser")
 ```
 
+defining script variables and which parts to run
+
+```{r}
+thGvalue <- 0.01
+thRvalue <- 0.025
+rRatioValue <- 1.5
+
+thGloop <- "n"
+thRloop <- "n"
+rRatioLoop <- "n"
+offsetPos <- "n"
+
+saveOut <- "n"
+
+offsetRegion <- "not possible"
+```
 
 split colour channels 
 
@@ -74,21 +80,32 @@ offset subtraction - cropped
 
 ```{r}
 
-par(mfrow = c(1,2))
-plot(imgG[297:317, 113:133]*4) # examining offset area 
-plot(imgR[297:317, 113:133]*4)
+if(offsetPos == "y") {
+  
+  par(mfrow = c(1,2))
+  plot(imgG[948:975, 325:360]*4)
+  plot(imgR[948:975, 325:360]*4)
 
-osR=mean(imgR[297:317, 113:133]) # taking mean inensity of area 
-osG=mean(imgG[297:317, 113:133])
+  osR=mean(imgR[948:975, 325:360])
+  osG=mean(imgG[948:975, 325:360])
 
-imgRo <- imgR - osR # subtracting mean intensity from full image 
-imgGo <- imgG - osG
+  imgRo <- imgR - osR # subtracting mean intensity from full image 
+  imgGo <- imgG - osG
 
-par(mfrow = c(2,2))
-plot(imgR)
-plot(imgRo)
-plot(imgG)
-plot(imgGo)
+  par(mfrow = c(2,2))
+  plot(imgR)
+  plot(imgRo)
+  plot(imgG)
+  plot(imgGo)
+
+} else {
+  
+  cat("no offset possible")
+  
+  imgRo <- imgR
+  imgGo <- imgG
+  
+}
 ```
 
 explore image 
@@ -96,15 +113,16 @@ explore image
 ```{r}
 
 par(mar = c(5,5,5,5))
-
-hist(img)
-img
+par(mfrow = c(2,2))
 
 hist(imgRo)
 imgRo
 
 hist(imgGo)
 imgGo
+
+hist(img)
+img
 
 ```
 
@@ -120,8 +138,8 @@ k
 
 imgGe <- EBImage::filter2(gblur(imgGo,sigma=1.5),k)
 par(mfrow = c(2,1))
-plot(img)
-plot(normalize(imgGe))
+#plot(img)
+#plot(normalize(imgGe))
 
 ```
 
@@ -131,7 +149,7 @@ adaptive thresholding - exploring offset
 
 if(thGloop == "y") {
   
-  for (i in seq(from = 0.015, to = 0.3, by = 0.015)) {
+  for (i in seq(from = 0.005, to = 0.05, by = 0.005)) {
   
     x <- thresh(imgGe, w=5, h=5, offset= i)
   
@@ -153,7 +171,7 @@ selecting best method
 ```{r}
 
 imgGth <- thresh(imgGe, w=5, h=5, offset = thGvalue)
-plot(imgGth)
+#plot(imgGth)
 
 ```
 
@@ -208,8 +226,8 @@ k
 
 imgRe <- EBImage::filter2(gblur(imgRb,sigma=1.5),k)
 par(mfrow = c(2,1))
-plot(img)
-plot(normalize(imgRe))
+#plot(img)
+#plot(normalize(imgRe))
 
 ```
 
@@ -219,7 +237,7 @@ adaptive thresholding - exploring offset
 
 if(thRloop == "y") {
   
-  for (i in seq(from = 0.015, to = 0.3, by = 0.015)) {
+  for (i in seq(from = 0.005, to = 0.05, by = 0.005)) {
   
     x <- thresh(imgRe, w=5, h=5, offset= i)
   
@@ -241,7 +259,7 @@ adaptive thresholding - selecting best method
 ```{r}
 
 imgRth <- thresh(imgRe, w=5, h=5, offset= thRvalue)
-plot(imgRth)
+#plot(imgRth)
 
 ```
 
@@ -273,17 +291,17 @@ cellLocG <- as.data.frame(computeFeatures.moment(nmaskG))
 plotting segmentation
 
 ```{r}
-par(mfrow = c(1,1))
+#par(mfrow = c(1,1))
 
-plotontop(img, cellLocG, cellLocR, "m.cx", "m.cy")
+#plotontop(img, cellLocG, cellLocR, "m.cx", "m.cy")
 ```
 
 plotting original segmentation 
 
 ```{r}
-par(mfrow = c(1,1))
+#par(mfrow = c(1,1))
 
-plotontop(img, OGgreen, OGred, "XM", "YM")
+#plotontop(img, OGgreen, OGred, "XM", "YM")
 ```
 
 ### removing duplicated cells 
@@ -318,8 +336,8 @@ NN_all <- as.data.frame(cbind(NN_which, NN_dist))
 examining dist data
 
 ```{r}
-par(mar = c(10,10,10,10))
-par(mfrow = c(1,1))
+par(mar = c(4,4,4,4))
+par(mfrow = c(2,2))
 
 min(NN_all$NN_dist)
 max(NN_all$NN_dist)
@@ -363,9 +381,15 @@ plotontop(img, OGgreen, OGred, "XM", "YM") # comparing to original
 ### saving output 
 
 ```{r}
+if(saveOut == "y") {
+  
+  write.csv(cellLocLive, paste0("results/segmentation/", outputName, "_live.csv"))
+  write.csv(cellLocR, paste0("results/segmentation/", outputName, "_dead.csv"))
 
-write.csv(cellLocLive, paste0("results/segmentation/Live_", outputName, ".csv"))
-write.csv(cellLocLive, paste0("results/segmentation/Dead_", outputName, ".csv"))
-
+  write.table(c(thGvalue, thRvalue, rRatioValue, offsetRegion), paste0("results/segmentation/", outputName, "_values.txt"), sep = "\t")
+  
+} else {
+  cat("not saved")
+}
 ```
 
