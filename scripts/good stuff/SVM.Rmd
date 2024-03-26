@@ -1,0 +1,253 @@
+---
+title: "SVM"
+author: "Drew"
+date: "2024-02-24"
+output: html_document
+---
+
+```{r}
+#install.packages("e1071", repos = "https://www.stats.bris.ac.uk/R/")
+#install.packages(c("kernlab"), repos = "https://www.stats.bris.ac.uk/R/")
+install.packages(c("unbalanced"), repos = "https://www.stats.bris.ac.uk/R/")
+```
+
+```{r}
+library("e1071")
+library(RColorBrewer) 
+library(tidyverse)   
+library(kernlab)     
+library(caret)
+library(ROSE)
+```
+
+```{r}
+set.seed(800813)
+```
+
+```{r}
+
+dead <- read.csv("results/deadInf.csv")
+live <- read.csv("results/livingInf.csv")
+
+allCells <- rbind(live, dead)
+allCells$condition <- as.factor(allCells$condition)
+allCells <- allCells[,c("condition", "aliveN", "deadN", "dist.1", "densityVal")]
+str(allCells)
+
+allCells$ratioN <- (allCells[, "aliveN"] +1) / (allCells[, "deadN"] +1)
+
+```
+
+exploring data 
+
+```{r}
+
+par(mfrow = c(2,2))
+
+ggplot(allCells, mapping = aes(x = aliveN, y = deadN, colour = condition)) +
+  geom_point() +
+  geom_jitter()
+
+ggplot(allCells, mapping = aes(x = ratioN, y = meanDist, colour = condition)) +
+  geom_point()+
+  geom_jitter()
+
+ggplot(allCells, mapping = aes(x = ratioN, y = sumDist, colour = condition)) +
+  geom_point()+
+  geom_jitter()
+
+ggplot(allCells, mapping = aes(x = ratioN, y = dist.1, colour = condition)) +
+  geom_point()+
+  geom_jitter()
+
+```
+
+### splitting data 
+
+```{r}
+
+index <- createDataPartition(allCells$condition, p = 0.2, list = FALSE) # taking 40% of data
+trainD <- allCells[index, ]
+testD <- allCells[-index, ]
+
+sum(trainD$condition == 0)
+sum(trainD$condition == 1)
+
+```
+
+
+initial SVM 
+
+```{r}
+
+dat <- iris
+
+test <- trainD[, "condition"]
+
+SVM1dat <- trainD[, c("ratioN", "dist.1", "densityVal")]
+SVM1dat <- cbind(SVM1dat, test)
+
+SVM2dat <- trainD[, c("m.cx", "m.cy")]
+SVM2dat <- cbind(SVM2dat, y)
+
+svmfit <- svm(test ~ ., data = SVM1dat, kernel = "linear", gamma = 1, cost = 1)
+plot(svmfit, SVM1dat)
+
+svmfit2 <- svm(y ~ ., data = SVM2dat, kernel = "polynomial", gamma = 1, cost = 1)
+plot(svmfit2, SVM2dat)
+
+rm(test)
+
+str(SVM1dat)
+```
+
+```{r}
+svmfit1 <- svm(test ~ ., data = SVM1dat, kernel = "sigmoid", gamma = 1, cost = 1, degree = 3, scale = TRUE)
+plot(svmfit1, SVM1dat)
+summary(svmfit1)
+print(svmfit1)
+testdata <- testD[, c("ratioN", "dist.1", "densityVal")]
+testdata2 <- testD[, c("condition")]
+pred <- predict(svmfit1, testdata) 
+table(pred, testdata2)
+
+
+
+
+svmfit2 <- svm(y ~ ., data = SVM1dat, kernel = "radial", gamma = 1, cost = 1)
+plot(svmfit1, SVM1dat)
+
+svmfit3 <- svm(y ~ ., data = SVM1dat, kernel = "sigmoid", gamma = 1, cost = 1)
+plot(svmfit1, SVM1dat)
+```
+
+```{r}
+
+index <- createDataPartition(allCells$condition, p = 0.4, list = FALSE) # taking 40% of data
+trainD <- allCells[index, c("condition", "aliveN", "deadN", "dist.1", "densityVal")]
+testD <- allCells[-index, c("condition", "aliveN", "deadN", "dist.1", "densityVal")]
+alldat <- rbind(trainD, testD)
+
+sum(trainD$condition == 0)
+sum(trainD$condition == 1)
+
+```
+
+
+```{r}
+
+dead <- read.csv("results/deadInf.csv")
+live <- read.csv("results/livingInf.csv")
+
+allCells <- rbind(live, dead)
+allCells$condition <- as.factor(allCells$condition)
+allCells$ratioN <- (allCells[, "aliveN"] +1) / (allCells[, "deadN"] +1)
+allCells <- allCells[,c("condition", "ratioN", "dist.1", "densityVal")]
+str(allCells)
+
+```
+
+
+splitting data - over + under sampling 
+
+```{r}
+
+index <- createDataPartition(allCells$condition, p = 0.4, list = FALSE) # taking 40% of data
+trainD <- allCells[index,]
+testD <- allCells[-index, ]
+
+trainDB <- ovun.sample(condition~., data=trainD, p=0.5,
+                        seed=1, method="both")$data
+
+sum(trainDB$condition == "0")
+sum(trainDB$condition == "1")
+
+```
+
+
+```{r}
+
+set.seed(101)
+
+svmfit1 <- svm(condition ~ ., data = trainDB, kernel = "sigmoid", gamma = 1, cost = 1, scale = TRUE)
+
+summary(svmfit1)
+print(svmfit1)
+
+pred <- predict(svmfit1, testD) 
+table(pred, testD[, 1])
+
+pred <- predict(svmfit1, testD, decision.values = TRUE)
+attr(pred, "decision.values")[1:12,]
+
+#plot(cmdscale(dist(alldat[,-1])),
+#     col = as.integer(alldat[,1]),
+#    pch = c("o","+")[1:409 %in% svmfit1$index + 1])
+
+
+
+```
+
+
+```{r}
+
+dead <- read.csv("results/deadInf.csv")
+live <- read.csv("results/livingInf.csv")
+
+allCells <- rbind(live, dead)
+allCells$condition <- as.factor(allCells$condition)
+allCells$ratioN <- (allCells[, "aliveN"] +1) / (allCells[, "deadN"] +1)
+allCells <- allCells[,c("condition", "ratioN", "m.cx", "m.cy", "dist.1", "densityVal")]
+str(allCells)
+
+```
+
+
+splitting data - over + under sampling 
+
+```{r}
+
+index <- createDataPartition(allCells$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainD <- allCells[index,]
+testD <- allCells[-index, ]
+
+trainDB <- ovun.sample(condition~., data=trainD, p=0.5,
+                        seed=1, method="both")$data
+
+sum(trainDB$condition == "0")
+sum(trainDB$condition == "1")
+
+```
+
+
+```{r}
+
+set.seed(101)
+
+svmXY <- svm(condition ~ ., data = trainD, kernel = "sigmoid", gamma = 1, cost = 1, scale = TRUE)
+
+summary(svmXY)
+print(svmXY)
+
+predXY <- predict(svmXY, testD) 
+table(predXY, testD[, 1])
+
+predXYd <- predict(svmXY, testD, decision.values = TRUE)
+attr(predXYd, "decision.values")[1:12,]
+
+
+
+set.seed(101)
+
+svmXYbal <- svm(condition ~ ., data = trainDB, kernel = "sigmoid", gamma = 1, cost = 1, scale = TRUE)
+
+summary(svmXYbal)
+print(svmXYbal)
+
+predXYbal <- predict(svmXYbal, testD) 
+table(predXYbal, testD[, 1])
+
+predXYbalB <- predict(svmXYbal, testD, decision.values = TRUE)
+attr(predXYbalB, "decision.values")[1:12,]
+
+```

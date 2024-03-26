@@ -1,7 +1,7 @@
 ---
-title: "Spatial_analysis"
+title: "SpatialAnalysis"
 author: "Drew"
-date: "2024-02-05"
+date: "2024-03-09"
 output: html_document
 ---
 
@@ -17,7 +17,7 @@ library(deldir)
 ```
 
 ```{r}
-inputName <- "1_PAA_48_40_3"
+inputName <- "1_NaClO_48_40_3"
 ```
 
 
@@ -39,6 +39,7 @@ dead[,"condition"] <- 0
 
 fullcells <- rbind(living, dead)
 fullcells$condition <- as.factor(fullcells$condition)
+fullcells$id <- rownames(fullcells)
 str(fullcells)
 ```
 
@@ -123,9 +124,9 @@ extracting distance data - to any cell
 
 ```{r}
 
-NNdist <- as.data.frame(nndist(pat, k = 1:5))
-NNdist[,"meanDist"] <- rowMeans(NNdist[, 1:5], na.rm = TRUE)
-NNdist[,"sumDist"] <- rowSums(NNdist[, 1:5], na.rm = TRUE)
+NNdist <- as.data.frame(nndist(pat, k = 1:6))
+NNdist[,"meanDist"] <- rowMeans(NNdist[, 1:6], na.rm = TRUE)
+NNdist[,"sumDist"] <- rowSums(NNdist[, 1:6], na.rm = TRUE)
 
 ```
 
@@ -133,13 +134,12 @@ extracting distance data - to live / dead cell
 
 ```{r}
 
-NNdeadLive <- nncross(patDead, patLive, what = "dist", k = 1:3)
-NNliveDead <- nncross(patLive, patDead, what = "dist", k = 1:3)
-NNdeadDead <- nndist(patDead, k = 1:3)
-NNliveLive <- nndist(patLive, k = 1:3)
+NNdeadLive <- nncross(patDead, patLive, what = "dist", k = 1:6)
+NNliveDead <- nncross(patLive, patDead, what = "dist", k = 1:6)
+NNdeadDead <- nndist(patDead, k = 1:6)
+NNliveLive <- nndist(patLive, k = 1:6)
 
 ```
-
 
 extracting how many living and how many dead neighbours in certain radius
 
@@ -157,17 +157,57 @@ neighbourInf <- t(markstat(pat, NEcounts, R = 15))
 
 ```
 
+veronoi tesselation 
+
+```{r}
+
+voronoi <- deldir(fullcells[,1:2], z = fullcells[,3], rw=c(0, 1024, 0, 512), eps=1e-09, sort=TRUE, plot=T,
+                  round=TRUE,digits=6, id=fullcells[,4])
+
+print(voronoi)
+
+vorInf <- voronoi$summary
+nbrs <- getNbrs(voronoi)
+
+```
+
+
+```{r}
+
+dead.live <- matrix(nrow = length(nbrs), ncol = 2)
+colnames(dead.live) <- c("deadNV", "liveNV")
+
+
+for (i in seq_along(nbrs)) {
+  x <- as.character(nbrs[[i]])
+  Ninf <- as.character(vorInf[x, "z"])
+  dead <- as.numeric(sum(Ninf == "0"))
+  live <- as.numeric(sum(Ninf == "1"))
+  dead.live[i, "deadNV"] <- dead
+  dead.live[i, "liveNV"] <- live
+}
+
+```
+
+
 creating data frame of output 
 
 ```{r}
 deadDLdist <- as.data.frame(cbind(NNdeadLive, NNdeadDead))
-  colnames(deadDLdist) <- c("distLive.1", "distLive.2", "distLive.3", "distDead.1", "distDead.2", "distDead.3")
+  #colnames(deadDLdist) <- c("distLive.1", "distLive.2", "distLive.3", "distDead.1", "distDead.2", "distDead.3")
 liveDLdist <- as.data.frame(cbind(NNliveLive, NNliveDead))
-  colnames(liveDLdist) <- c("distLive.1", "distLive.2", "distLive.3", "distDead.1", "distDead.2", "distDead.3")
+  #colnames(liveDLdist) <- c("distLive.1", "distLive.2", "distLive.3", "distDead.1", "distDead.2", "distDead.3")
   
 DLdist <- rbind(liveDLdist, deadDLdist)
+DLdist$liveMeanDist <- rowMeans(DLdist[, 1:6], na.rm = TRUE)
+DLdist$deadMeanDist <- rowMeans(DLdist[, 7:12], na.rm = TRUE)
 
-cellInf <- cbind(fullcells, densityVal, NNdist, neighbourInf, DLdist)
+cellInf <- cbind(fullcells, densityVal, NNdist[, "meanDist"], neighbourInf, 
+                 DLdist[, c("liveMeanDist", "deadMeanDist")], dead.live, 
+                 vorInf[, c("n.tri", "n.tside", "nbpt", "dir.area")])
+
+cellInf <- cellInf[cellInf$nbpt == 0 ,]
+
 
 deadInf <- cellInf[cellInf$condition == 0 ,]
 liveInf <- cellInf[cellInf$condition == 1 ,]
@@ -206,42 +246,9 @@ saving output
 
 ```{r}
 
-write.csv(deadInf, paste0("results/cellInfo/", inputName, ".Dead.Inf.csv"))
-write.csv(liveInf, paste0("results/cellInfo/", inputName, ".Live.Inf.csv"))
-write.csv(cellInf, paste0("results/cellInfo/", inputName, ".All.Inf.csv"))
-
-```
-
-
-veronoi tesselation 
-
-
-```{r}
-
-voronoi <- deldir(fullcells[,1:2], z = fullcells[,3], rw=c(0, 1024, 0, 512), eps=1e-09, sort=TRUE, plot=T,
-       round=TRUE,digits=6, id=NULL)
-
-print(voronoi)
-
-vorInf <- voronoi$summary
-nbrs <- getNbrs(voronoi)
-
-```
-
-```{r}
-
-dead.live <- matrix(nrow = length(nbrs), ncol = 2)
-colnames(dead.live) <- c("dead", "live")
-
-
-for (i in seq_along(nbrs)) {
-  x <- as.character(nbrs[[i]])
-  Ninf <- as.character(vorInf[x, "z"])
-  #dead <- as.numeric(sum(Ninf == "0"))
-  #live <- as.numeric(sum(Ninf == "1"))
-  dead.live[i, "dead"] <- as.numeric(sum(Ninf == "0"))
-  dead.live[i, "live"] <- as.numeric(sum(Ninf == "1"))
-}
+write.csv(deadInf, paste0("results/newCellInfo/", inputName, ".Dead.Inf.csv"))
+write.csv(liveInf, paste0("results/newCellInfo/", inputName, ".Live.Inf.csv"))
+write.csv(cellInf, paste0("results/newCellInfo/", inputName, ".All.Inf.csv"))
 
 ```
 

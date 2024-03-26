@@ -1,0 +1,75 @@
+---
+title: "feature_analysis"
+author: "Drew"
+date: "2024-02-28"
+output: html_document
+---
+
+```{r}
+library(corrplot)
+library(nortest)
+```
+
+
+```{r}
+dir <- "results/cellInfo"
+files <- list.files(path = dir, pattern = "All.Inf.csv", full.names = TRUE)
+```
+
+adding all data into a list 
+
+```{r}
+
+data <- list()
+
+for (i in files) {
+  title <- strsplit(basename(i), "\\.")[[1]][1]
+  x <- read.csv(i)  # You can use read.csv, read.table, or any other suitable function
+  data[[title]] <- x
+}
+
+datNames <- names(data)
+varNames <- colnames(data[[1]])
+```
+
+correlation test 
+
+```{r}
+
+
+for (i in datNames) {
+  #par(mar = c(5,4,4,4))
+  cat(paste(i))
+
+  corTestDat <- cor(data[[i]][, c(2:3, 5:16)])
+  print(corTestDat)
+  corrplot(corTestDat, method = "color", title = paste(i))
+
+}
+
+```
+
+normality 
+
+```{r}
+
+for (i in datNames) {
+  #par(mar = c(5,4,4,4))
+  cat(paste(i))
+
+  dat <- data[[i]]
+  dead <- dat[dat$condition == 0 ,]
+  live <- dat[dat$condition == 1 ,]
+  
+  for (x in varNames[!varNames %in% c("X", "condition", "aliveN", "deadN")]) {
+  
+    cat(paste("dead", x))
+    test <- print(ad.test(dead[[x]]))
+    cat(paste("live", x))
+    print(ad.test(live[[x]]))
+    
+  }
+}
+
+```
+

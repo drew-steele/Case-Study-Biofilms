@@ -1,0 +1,245 @@
+---
+title: "spatial_presentation_stuff"
+author: "Drew"
+date: "2024-02-23"
+output: html_document
+---
+
+```{r}
+#library(EBImage)
+library(spatstat)
+```
+
+```{r}
+
+living <- read.csv("results/livingCellsLoc.csv")
+dead <- read.csv("results/deadCellsLoc.csv")
+
+```
+
+data prep 
+
+```{r}
+living <- living[, c("m.cx", "m.cy")]
+living[,"condition"] <- 1
+
+dead <- dead[, c("m.cx", "m.cy")]
+dead[,"condition"] <- 0
+
+fullcells <- rbind(living, dead)
+```
+
+point pattern object 
+
+```{r}
+pat <- ppp(fullcells[,1], fullcells[,2], c(0,1024), c(0,512)) # creating point pattaern object 
+marks(pat) <- fullcells[,3] # adding infor on live dead - any extra info refered to as mark in spatstat
+
+anyDuplicated(pat) # checking for duplicated poitns 
+plot(pat)
+```
+
+extracting how many living and how many dead neighbours in certain radius + dist to clsoet 3 negihbours 
+
+```{r}
+
+NEcounts <- function(x) {
+  alive_count <- sum(x == 1)
+  dead_count <- sum(x == 0)
+  
+  return(c(aliveN = alive_count, deadN = dead_count))
+}
+
+neighboursInfo <- t(markstat(pat, NEcounts, R = 20))
+
+NNdist <- nndist(pat, k = 1:3)
+
+```
+
+```{r}
+plot(pat, main = "Point Pattern with 20-radius Neighborhood")
+
+# Choose a point for demonstration
+demo_point <- pat[1, ]
+symbols(demo_point$x, demo_point$y, circles = 20, add = TRUE, inches = 0.05, col = "red", bg = NA)
+
+# Add the 20-radius neighborhood around the chosen point
+plot(circle(demo_point, radius = 20), add = TRUE, col = "lightblue")
+symbols(demo_point$x, demo_point$y, circles = 20, add = TRUE, inches = 0.05, col = "lightblue", bg = NA)
+addcircle(demo_point, radius = 20, col = "lightblue")
+addmarks(demo_point, type = "circle", radius = 20, col = "lightblue", border = NA)
+
+
+plot(X)
+
+# Add a circle around the specific point
+plot(circle(x0, y0, radius), add = TRUE, col = "red")
+```
+
+
+extracting distance to closet neighbour 
+
+```{r}
+NNdist <- nndist(pat, k = 1:3)
+k3dists <- cbind(fullcells, NNdist) 
+str(k3dists)
+k3dists[,"meanDist"] <- rowMeans(k3dists[, 4:6], na.rm = TRUE)
+k3dists[,"sumDist"] <- rowSums(k3dists[, 4:6], na.rm = TRUE)
+
+#livetest <- k3dists[k3dists$condition == "1" ,]
+#deadtest <- k3dists[k3dists$condition == "0" ,]
+
+#mean(livetest$sumDist)
+#mean(deadtest$sumDist)
+
+#mean(livetest$meanDist)
+#mean(deadtest$meanDist)
+```
+
+
+creating data frame of output 
+
+```{r}
+
+cellInf <- cbind(fullcells, NNdist)
+cellInf[,"meanDist"] <- rowMeans(cellInf[, 4:6], na.rm = TRUE)
+cellInf[,"sumDist"] <- rowSums(cellInf[, 4:6], na.rm = TRUE)
+
+cellInf <- cbind(cellInf, neighboursInfo)
+cellInf[, "sumN"] <- cellInf[, "aliveN"] + cellInf[, "deadN"]
+
+deadInf <- cellInf[cellInf$condition == 0 ,]
+livingInf <- cellInf[cellInf$condition == 1 ,]
+
+```
+
+exploring output
+
+```{r}
+
+library(nortest)
+
+mean(livingInf$sumN)
+mean(deadInf$sumN)
+
+mean(livingInf$NNdist)
+mean(deadInf$NNdist)
+
+hist(livingInf$sumN)
+qqnorm(livingInf$sumN)
+qqline(livingInf$sumN)
+ad.test(livingInf$sumN)
+
+hist(deadInf$sumN)
+qqnorm(deadInf$sumN)
+qqline(deadInf$sumN)
+ad.test(deadInf$sumN)
+shapiro.test(deadInf$sumN)
+
+hist(livingInf$NNdist)
+qqnorm(livingInf$NNdist)
+qqline(livingInf$NNdist)
+ad.test(livingInf$NNdist)
+
+hist(deadInf$NNdist)
+qqnorm(deadInf$NNdist)
+qqline(deadInf$NNdist)
+ad.test(deadInf$NNdist)
+shapiro.test(deadInf$NNdist)
+
+```
+
+saving outputs 
+
+```{r}
+
+write.csv(deadInf, "results/deadInf.csv")
+write.csv(livingInf, "results/livingInf.csv")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#img <- readImage("results/img.tiff")
+red <- read.csv("results/redcells.csv")
+green <- read.csv("results/greencells.csv")
+```
+
+```{r}
+red <- red[,2:3]
+red[,3] <- "dead"
+
+green <- green[,2:3]
+green[,3] <- "live"
+ 
+allcells <- rbind(red, green)
+colnames(allcells) <- c("x", "y", "condition")
+
+min(allcells$x)
+min(allcells$y)
+max(allcells$x)
+max(allcells$y)
+```
+
+creating spatstat point pattern object 
+
+```{r}
+pat <- ppp(allcells[,1], allcells[,2], c(0,513), c(0,513)) # creating point pattaern object 
+marks(pat) <- allcells[,3] # adding infor on live dead - any extra info refered to as mark in spatstat
+anyDuplicated(pat) # checking for duplicated poitns 
+```
+
+general descriptive statistics
+
+```{r}
+# global_density <- length(bike_theft_2019$NAME)/sum(st_area(london_ward_shp))
+```
+
+
+
+```{r}
+plot(myPattern)
+summary(myPattern)
+plot(Kest(myPattern))
+plot(density(myPattern))
+plot(smooth(myPattern))
+```
+
+```{r}
+radius <- 0.1
+n_neighbors <- nncross(myPattern, k = 0, r = radius, by = "marks")
+```
+
+```{r}
+radius <- 2  # replace with your desired radius
+neighbors <- nncross(allcells$x, allcells$y, r = radius)
+```
+
+```{r}
+W <- square(1)
+set.seed(42)
+Y <- runifpoint(2000) # Random points in the unit square
+plot(Y, main = "Random points in unit square")
+```
+
+```{r}
+xy <- gridcenters(W, 513, 513) # Grid of points in the unit square
+X <- ppp(xy$x, xy$y, window = W, check = FALSE, checkdup = FALSE)
+plot(X)
+```
+
+```{r}
+test <- crosspaircounts(myPattern, X, r = 0.5)
+```
+
+could also exract info such as of the 10 neareast neighbours, how many are dead and how many are alive 

@@ -1,0 +1,297 @@
+---
+title: "Untitled"
+author: "Drew"
+date: "2024-01-26"
+output: html_document
+---
+
+```{r}
+library(EBImage)
+```
+
+```{r}
+img1 <- readImage("data/test/PAA1.tif")
+img2 <- readImage("data/test/PAA2.tif")
+img3 <- readImage("data/test/PAA3.tif")
+
+img4 <- readImage("data/test/H21.tif")
+img5 <- readImage("data/test/H22.tif")
+img6 <- readImage("data/test/H23.tif")
+
+img7 <- readImage("data/test/3750_48/N1.tif")
+img8 <- readImage("data/test/3750_48/N2.tif")
+img9 <- readImage("data/test/3750_48/N3.tif")
+```
+
+```{r}
+img1
+```
+
+
+```{r}
+display(img1, method="browser")
+display(img2, method="browser")
+display(img3, method="browser")
+```
+
+```{r}
+red1 <- read.csv("data/test/PAA1_red.csv")
+red2 <- read.csv("data/test/PAA2_red.csv")
+red3 <- read.csv("data/test/PAA3_red.csv")
+
+green1 <- read.csv("data/test/PAA1_green.csv")
+green2 <- read.csv("data/test/PAA2_green.csv")
+green3 <- read.csv("data/test/PAA3_green.csv")
+```
+
+```{r}
+red4 <- read.csv("data/test/H21_red.csv")
+red5 <- read.csv("data/test/H22_red.csv")
+red6 <- read.csv("data/test/H23_red.csv")
+
+green4 <- read.csv("data/test/H21_green.csv")
+green5 <- read.csv("data/test/H22_green.csv")
+green6 <- read.csv("data/test/H23_green.csv")
+```
+
+```{r}
+red7 <- read.csv("data/test/3750_48/N1_red.csv")
+red8 <- read.csv("data/test/3750_48/N2_red.csv")
+red9 <- read.csv("data/test/3750_48/N3_red.csv")
+
+green7 <- read.csv("data/test/3750_48/N1_green.csv")
+green8 <- read.csv("data/test/3750_48/N2_green.csv")
+green9 <- read.csv("data/test/3750_48/N3_green.csv")
+```
+
+```{r}
+# plot()
+```
+
+```{r}
+par(mfrow = c(1,1))
+#plot(red$XM~red$YM)
+#plot(img)
+#hist(img)
+```
+
+```{r}
+img_flip = flip(img1)
+imgT = transpose(img1)
+plot(img_flip)
+plot(img1)
+plot(imgT)
+```
+
+
+```{r}
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img_flip, 0, 0, 1, dim(img1)[2]/dim(img1)[1])
+points(x = red1$XM / dim(img1)[1], y = red1$YM / dim(img1)[1], col = "red", pch = 1)
+points(x = green1$XM / dim(img1)[1], y = green1$YM / dim(img1)[1], col = "blue", pch = 1)
+
+
+max(green1$YM)
+min(green1$YM)
+max(green1$XM)
+min(green1$XM)
+#plot(img_flip)
+```
+
+
+```{r}
+
+plotontop <- function(img, red, green) {
+  
+  x <- flip(img)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = red$XM / dim(x)[1], y = red$YM / dim(x)[1], col = "red", pch = 1)
+  #points(x = green$XM / dim(x)[1], y = green$YM / dim(x)[1], col = "blue", pch = 1)
+  
+}
+```
+
+```{r}
+plotontop(img9, red9, green3)
+```
+
+
+```{r}
+imgR <- getFrame(img1, 1)
+imgG <- getFrame(img1, 2)
+
+plot(imgR)
+plot(imgG)
+```
+
+
+```{r}
+img2 = flip(img2)
+hist(img2)
+```
+
+
+```{r}
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img2, 0, 0, 1, 1)
+points(x = red2$XM / max(red2$XM), y = red2$YM / max(red2$YM), col = "red", pch = 1)
+points(x = green2$XM / max(green2$XM), y = green2$YM / max(green2$YM), col = "blue", pch = 1)
+
+#plot(img2)
+```
+
+```{r}
+img3 <- flip(img3)
+```
+
+```{r}
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img3, 0, 0, 1, 1)
+points(x = red3$XM / max(red3$XM), y = red3$YM / max(red3$YM), col = "red", pch = 1)
+points(x = green3$XM / max(green3$XM), y = green3$YM / max(green3$YM), col = "blue", pch = 1)
+
+#plot(img2)
+```
+
+
+```{r}
+img4 <- flip(img4)
+```
+
+```{r}
+
+par(mfrow = c(1,1))
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img4, 0, 0, 1, 1)
+points(x = red4$XM / max(red4$XM), y = red4$YM / max(red4$YM), col = "red", pch = 1)
+#points(x = green4$XM / max(green4$XM), y = green4$YM / max(green4$YM), col = "blue", pch = 1)
+
+#plot(img4*2)
+```
+
+
+```{r}
+img5 <- flip(img5)
+```
+
+```{r}
+
+par(mfrow = c(1,1))
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img5, 0, 0, 1, 1)
+points(x = red5$XM / max(red5$XM), y = red5$YM / max(red5$YM), col = "red", pch = 1)
+#points(x = green5$XM / max(green5$XM), y = green5$YM / max(green5$YM), col = "blue", pch = 1)
+
+# plot(img5*2)
+```
+
+
+```{r}
+img6 <- flip(img6)
+```
+
+```{r}
+
+par(mfrow = c(1,1))
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img6, 0, 0, 1, 1)
+points(x = red6$XM / max(red6$XM), y = red6$YM / max(red6$YM), col = "red", pch = 1)
+points(x = green6$XM / max(green6$XM), y = green6$YM / max(green6$YM), col = "blue", pch = 1)
+
+# plot(img6*2)
+```
+
+
+```{r}
+img7 <- flip(img7)
+```
+
+```{r}
+
+par(mfrow = c(1,1))
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img7, 0, 0, 1, 1)
+points(x = red7$XM / max(red7$XM), y = red7$YM / max(red7$YM), col = "red", pch = 1)
+points(x = green7$XM / max(green7$XM), y = green7$YM / max(green7$YM), col = "blue", pch = 1)
+
+#plot(img7)
+#hist(img7)
+```
+
+
+```{r}
+img8 <- flip(img8)
+```
+
+```{r}
+
+par(mfrow = c(1,1))
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img8, 0, 0, 1, 1)
+points(x = red8$XM / max(red8$XM), y = red8$YM / max(red8$YM), col = "red", pch = 1)
+points(x = green8$XM / max(green8$XM), y = green8$YM / max(green8$YM), col = "blue", pch = 1)
+
+#plot(img8*2)
+```
+
+
+```{r}
+img9 <- flip(img9)
+```
+
+```{r}
+
+par(mfrow = c(1,1))
+par(mar = c(0, 0, 0, 0))  # Set margins to zero
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+
+rasterImage(img9, 0, 0, 1, 1)
+points(x = red9$XM / max(red9$XM), y = red9$YM / max(red9$YM), col = "red", pch = 1)
+#points(x = green9$XM / max(green9$XM), y = green9$YM / max(green9$YM), col = "blue", pch = 1)
+
+#plot(img9)
+```
+
+
+
+```{r}
+for (i in 1:9) {
+  if (exists(paste0("red", i))) {
+    # Replace the number 100 with the appropriate size of your data
+    hist(get(paste0("red", i))$XM, main = paste0("Histogram for red", i, " XM"))
+    hist(get(paste0("red", i))$YM, main = paste0("Histogram for red", i, " YM"))
+  } else {
+    warning(paste0("red", i, " does not exist."))
+  }
+}
+
+hist(red1$XM)
+hist(red1$YM)
+
+hist(red2$XM)
+hist(red2$YM)
+
+hist(red3$XM)
+hist(red3$YM)
+```
+

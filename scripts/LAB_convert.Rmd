@@ -1,0 +1,67 @@
+---
+title: "LAB_convert"
+author: "Drew"
+date: "2024-01-13"
+output: html_document
+---
+
+```{r}
+options(repos = c(CRAN = "https://cran.ma.imperial.ac.uk"))
+install.packages("ggplot2")
+install.packages("colorspace")
+install.packages("schemr")
+BiocManager::install("CRImage")
+```
+
+```{r}
+library(schemr)
+library(CRImage)
+```
+
+```{r}
+
+test <- as.array(imgRt)
+testB <- as.array(imgBbase)
+testR <- as.array(imgRbase)
+testG <- as.array(imgGbase)
+
+test <- rgb_to_lab(data.frame(r = testR, g = testG, b = testB), transformation = "Adobe")
+
+test <- rgb_to_lab(img, transformation = "sRGB", linear_func = NULL)
+```
+
+```{r}
+
+imgLAB=convertRGBToLAB(img)
+
+display(imgLAB, method="browser")
+
+imgLAB
+
+img1 <- getFrame(imgLAB, 1)
+img2 <- getFrame(imgLAB, 2)
+img3 <- getFrame(imgLAB, 3)
+
+display(img1, method="browser") # dispalying extracted spectrum - greyscale as only 1 colour channel 
+display(img2, method="browser")
+display(img3, method="browser")
+
+
+
+imgGbase <- channel(imgLAB, "green") # extracting green spectrum 
+imgRbase <- channel(imgLAB, "red")
+imgBbase <- channel(imgLAB, "blue")
+
+display(imgBbase, method="browser") # dispalying extracted spectrum - greyscale as only 1 colour channel 
+display(imgRbase, method="browser")
+display(imgGbase, method="browser")
+
+```
+
+```{r}
+f = system.file("data", "trial2.tif", package="CRImage")
+imgC <- readImage("data/trial2.tif", package="CRImage")
+
+img <- readImage("data/trial2.tif")
+```
+

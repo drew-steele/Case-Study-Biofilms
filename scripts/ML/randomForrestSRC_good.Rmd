@@ -1,0 +1,315 @@
+---
+title: "randomForrestSRC_good"
+author: "Drew"
+date: "2024-02-28"
+output: html_document
+---
+
+```{r}
+
+library(randomForestSRC)
+library(caret)
+library(ROSE)
+library(imbalance)
+
+```
+
+defining variables 
+
+```{r}
+
+dir <- "results/cellInfo/"
+datName1 <- "1_NaClO_48_40_2"
+datName2 <- "1_NaClO_48_40_3"
+
+```
+
+loading data 
+
+```{r}
+
+dat1 <- read.csv(paste0(dir, datName1, ".All.Inf.csv"))
+  dat1$condition <- as.factor(dat1$condition)
+dat2 <- read.csv(paste0(dir, datName2, ".All.Inf.csv"))
+  dat2$condition <- as.factor(dat2$condition)
+  
+str(dat1)
+str(dat2)
+
+```
+
+adding additional features
+
+```{r}
+
+dat1$meanDistLive <- rowMeans(dat1[, c("distLive.1","distLive.2", "distLive.3")])
+dat1$meanDistDead <- rowMeans(dat1[, c("distDead.1","distDead.2", "distDead.3")])
+dat1$ratioN <- (dat1[, "aliveN"] +1) / (dat1[, "deadN"] +1)
+
+dat2$meanDistLive <- rowMeans(dat2[, c("distLive.1","distLive.2", "distLive.3")])
+dat2$meanDistDead <- rowMeans(dat2[, c("distDead.1","distDead.2", "distDead.3")])
+dat2$ratioN <- (dat2[, "aliveN"] +1) / (dat2[, "deadN"] +1)
+
+datAll <- rbind(dat1,dat2)
+
+```
+
+spliting data 
+
+```{r}
+
+set.seed(101)
+
+## dat1
+
+index1 <- createDataPartition(dat1$condition, p = 0.7, list = FALSE) # taking 40% of data
+train1 <- dat1[index1, ]
+test1 <- dat1[-index1, ]
+
+sum(train1$condition == 0)
+sum(train1$condition == 1)
+sum(test1$condition == 0)
+sum(test1$condition == 1)
+
+## dat2
+
+index2 <- createDataPartition(dat2$condition, p = 0.7, list = FALSE) # taking 40% of data
+train2 <- dat2[index2, ]
+test2 <- dat2[-index2, ]
+
+sum(train2$condition == 0)
+sum(train2$condition == 1)
+sum(test2$condition == 0)
+sum(test2$condition == 1)
+
+## datAll
+
+indexAll <- createDataPartition(datAll$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainAll <- datAll[indexAll, ]
+testAll <- datAll[-indexAll, ]
+
+sum(trainAll$condition == 0)
+sum(trainAll$condition == 1)
+sum(testAll$condition == 0)
+sum(testAll$condition == 1)
+
+```
+
+creatign synthetic data with SMOTE 
+
+```{r}
+
+newDat1 <- mwmote(train1, numInstances = 50, classAttr = "condition")
+newDat2 <- mwmote(train2, numInstances = 50, classAttr = "condition")
+newDatAll <- mwmote(trainAll, numInstances = 50, classAttr = "condition")
+
+```
+
+feature selection 
+
+```{r}
+
+trn1.XYMD <- train1[, c("condition", "densityVal", "meanDist", "m.cx", "m.cy")]
+tst1.XYMD <- test1[, c("condition", "densityVal", "meanDist", "m.cx", "m.cy")]
+trn2.XYMD <- train2[, c("condition", "densityVal", "meanDist", "m.cx", "m.cy")]
+tst2.XYMD <- test2[, c("condition", "densityVal", "meanDist", "m.cx", "m.cy")]
+trnAll.XYMD <- trainAll[, c("condition", "densityVal", "meanDist", "m.cx", "m.cy")]
+tstAll.XYMD <- testAll[, c("condition", "densityVal", "meanDist", "m.cx", "m.cy")]
+
+trn1.XY <- train1[, c("condition", "m.cx", "m.cy")]
+tst1.XY <- test1[, c("condition","m.cx", "m.cy")]
+trn2.XY <- train2[, c("condition","m.cx", "m.cy")]
+tst2.XY <- test2[, c("condition", "m.cx", "m.cy")]
+trnAll.XY <- trainAll[, c("condition", "m.cx", "m.cy")]
+tstAll.XY <- testAll[, c("condition", "m.cx", "m.cy")]
+
+trn1.neigh <- train1[, c("condition", "meanDistDead", "meanDistLive", "ratioN")]
+tst1.neigh <- test1[, c("condition", "meanDistDead", "meanDistLive", "ratioN")]
+trn2.neigh <- train2[, c("condition", "meanDistDead", "meanDistLive", "ratioN")]
+tst2.neigh <- test2[, c("condition", "meanDistDead", "meanDistLive", "ratioN")]
+trnAll.neigh <- trainAll[, c("condition", "meanDistDead", "meanDistLive", "ratioN")]
+tstAll.neigh <- testAll[, c("condition", "meanDistDead", "meanDistLive", "ratioN")]
+
+trn1 <- train1[, c(2:5, 19:20)]
+tst1 <- test1[, c(2:5, 19:20)]
+trn2 <- train2[, c(2:5, 19:20)]
+tst2 <- test2[, c(2:5, 19:20)]
+trnAll <- trainAll[, c(2:5, 19:20)]
+tstAll <- testAll[, c(2:5, 19:20)]
+
+
+```
+
+creating the models 
+
+```{r}
+
+modXY.1 <- imbalanced(condition ~ ., trn1.XY, importance = T)
+modXY.2 <- imbalanced(condition ~ ., trn2.XY, importance = T)
+modXY.All <- imbalanced(condition ~ ., trnAll.XY, importance = T)
+
+modXYMD.1 <- imbalanced(condition ~ ., trn1.XYMD, importance = T)
+modXYMD.2 <- imbalanced(condition ~ ., trn2.XYMD, importance = T)
+modXYMD.All <- imbalanced(condition ~ ., trnAll.XYMD, importance = T)
+
+modneigh.1 <- imbalanced(condition ~ ., trn1.neigh, importance = T)
+modneigh.2 <- imbalanced(condition ~ ., trn2.neigh, importance = T)
+modneigh.All <- imbalanced(condition ~ ., trnAll.neigh, importance = T)
+
+mod.1 <- imbalanced(condition ~ ., trn1, importance = T)
+mod.2 <- imbalanced(condition ~ ., trn2, importance = T)
+mod.All <- imbalanced(condition ~ ., trnAll, importance = T)
+
+```
+
+evaluating models - XY 
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(modXY.1)
+print(predict(modXY.1, tst1.XY))
+print(predict(modXY.1, trn2.XY))
+plot(modXY.1)
+mod1XY.sub <- subsample(modXY.1, verbose = T)
+
+print(modXY.2)
+print(predict(modXY.2, tst2.XY))
+print(predict(modXY.2, tst1.XY))
+plot(modXY.2)
+mod2XY.sub <- subsample(modXY.2, verbose = T)
+
+print(modXY.All)
+print(predict(modXY.All, tstAll.XY))
+plot(modXY.All)
+modAllXY.sub <- subsample(modXY.All, verbose = T)
+
+par(mfrow = c(1,3))
+plot.subsample(mod1XY.sub, main = "Mod 1 XY")
+plot.subsample(mod2XY.sub, main = "Mod 2 XY")
+
+par(mfrow = c(1,1))
+par(mar = c(7,7,7,7))
+plot.subsample(modAllXY.sub, main = "Variable Importance (VIMP)")
+
+```
+
+evaluating models - XYMD 
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(modXYMD.1)
+print(predict(modXYMD.1, tst1.XYMD))
+print(predict(modXYMD.1, trn2.XYMD))
+plot(modXYMD.1)
+#mod1XYMD.sub <- subsample(modXYMD.1, verbose = T)
+
+print(modXYMD.2)
+print(predict(modXYMD.2, tst2.XYMD))
+print(predict(modXYMD.2, trn1.XYMD))
+plot(modXYMD.2)
+#mod2XYMD.sub <- subsample(modXYMD.2, verbose = T)
+
+print(modXYMD.All)
+print(predict(modXYMD.All, tstAll.XYMD))
+plot(modXYMD.All)
+#modAllXYMD.sub <- subsample(modXYMD.All, verbose = T)
+
+par(mfrow = c(1,3))
+plot.subsample(mod1XYMD.sub, main = "Mod XYMD 1")
+plot.subsample(mod2XYMD.sub, main = "Mod XYMD 2")
+plot.subsample(modAllXYMD.sub, main = "Mod XYMD All")
+
+par(mfrow = c(1,1))
+par(mar = c(7,7,7,7))
+plot.subsample(modAllXYMD.sub, main = "Variable Importance (VIMP)")
+
+```
+
+evaluating models - neigh
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(modneigh.1)
+print(predict(modneigh.1, tst1.neigh))
+plot(modneigh.1)
+mod1neigh.sub <- subsample(modneigh.1, verbose = T)
+
+print(modneigh.2)
+print(predict(modneigh.2, tst2.neigh))
+plot(modneigh.2)
+mod2neigh.sub <- subsample(modneigh.2, verbose = T)
+
+print(modneigh.All)
+print(predict(modneigh.All, tstAll.neigh))
+plot(modneigh.All)
+modAllneigh.sub <- subsample(modneigh.All, verbose = T)
+
+par(mfrow = c(1,3))
+plot.subsample(mod1neigh.sub, main = "Mod neigh 1")
+plot.subsample(mod2neigh.sub, main = "Mod neigh 2")
+plot.subsample(modAllneigh.sub, main = "Mod neigh All")
+
+```
+
+evaluating models - all relevant  
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(mod.1)
+print(predict(mod.1, tst1))
+print(predict(mod.1, trn2))
+plot(mod.1)
+#mod1.sub <- subsample(mod.1, verbose = T)
+
+
+print(mod.2)
+print(predict(mod.2, tst2))
+print(predict(mod.2, trn1))
+plot(mod.2)
+#mod2.sub <- subsample(mod.2, verbose = T)
+
+
+print(mod.All)
+print(predict(mod.All, tstAll))
+plot(mod.All)
+#modAll.sub <- subsample(mod.All, verbose = T)
+
+par(mfrow = c(1,3))
+plot.subsample(mod1.sub, main = "Mod All 1")
+plot.subsample(mod2.sub, main = "Mod All 2")
+plot.subsample(modAll.sub, main = "Mod All All")
+
+par(mar = c(7,7,7,7))
+par(mfrow = c(1,1))
+plot.subsample(modAll.sub, main = "Variable Importance (VIMP)")
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+length(unique(dat1$distLive.1))
+length(unique(dat1$distLive.2))
+length(unique(dat1$distDead.1))
+length(unique(dat1$distDead.2))
+
+length(unique(dat2$distLive.1))
+length(unique(dat2$distLive.2))
+length(unique(dat2$distDead.1))
+length(unique(dat2$distDead.2))
+```
+

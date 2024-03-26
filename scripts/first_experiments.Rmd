@@ -17,6 +17,8 @@ loading image in
 
 ```{r}
 img <- readImage("data/trial2.tif")
+
+writeImage(img, "test.jpeg")
 ```
 
 viewing image 
@@ -34,7 +36,7 @@ img # display general stats about image
 ```
 
 ```{r}
-# imgRt <- getFrame(img, 1)
+imgRt <- getFrame(img, 1)
 
 imgGbase <- channel(img, "green") # extracting green spectrum 
 imgRbase <- channel(img, "red")
@@ -118,14 +120,16 @@ display(Rthresh, method="browser")
 
 ```
 
+this seems like a nice method as it preserves a lot of spatial information 
+
 ```{r}
 
-Gat_img=EBImage::thresh(imgGbase,h = 5,w = 5, offset = 0.10)
+Gat_img=EBImage::thresh(CimgGbase,h = 5,w = 5, offset = 0.15)
 
 display(Gat_img, method="browser")
 display(imgGbase, method="browser")
 
-Rat_img=EBImage::thresh(imgRbase,h = 5,w = 5, offset = 0.10)
+Rat_img=EBImage::thresh(CimgRbase,h = 5,w = 5, offset = 0.15)
 
 display(Rat_img, method="browser")
 display(imgRbase, method="browser")
@@ -148,3 +152,50 @@ display(Gthresh, method="browser")
 display(img, method="browser")
 ```
 
+
+```{r}
+Cimg <- img * 2
+display(Cimg, method="browser")
+
+CimgGbase <- channel(Cimg, "green") # extracting green spectrum 
+CimgRbase <- channel(Cimg, "red")
+CimgBbase <- channel(Cimg, "blue")
+
+display(CimgBbase, method="browser") # dispalying extracted spectrum - greyscale as only 1 colour channel 
+display(CimgRbase, method="browser")
+display(CimgGbase, method="browser")
+
+CimgG <- rgbImage(red = 0 * CimgRbase, green = CimgGbase, blue = 0 * CimgBbase) # coonverting image back to colour image
+CimgR <- rgbImage(red = CimgRbase, green = 0 * CimgGbase, blue = 0 * CimgBbase)
+CimgB <- rgbImage(red = 0 * CimgRbase, green = 0 * CimgGbase, blue = CimgBbase)
+
+display(CimgB, method="browser") # displaying col image 
+display(CimgR, method="browser")
+display(CimgG, method="browser")
+
+display(Cimg, method="browser")
+
+hist(CimgGbase)
+CimgGbase
+
+hist(CimgRbase)
+CimgRbase
+
+test <- CimgRbase - CimgGbase 
+
+
+display(test, method="browser")
+
+#Gth <- otsu(imgGbase)
+Gthresh <- test>0.2
+display(Gthresh, method="browser")
+
+display(img, method="browser")
+
+```
+
+```{r}
+
+```
+
+for apply either dead or alive could use some if funcition in a loop running over all points in both immage arrays to colour the cell as red or green 

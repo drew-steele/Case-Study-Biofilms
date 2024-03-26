@@ -1,5 +1,5 @@
 ---
-title: "cell_segmentation"
+title: "Untitled"
 author: "Drew"
 date: "2024-02-05"
 output: html_document
@@ -21,7 +21,24 @@ display(img, method="browser")
 cropping 
 
 ```{r}
-imgCr = img[512:1024, 1:512, 1:3]
+#imgCr = img[100:355, 100:355, 1:3]
+
+#plot(imgCr)
+
+#hist(imgCr)
+
+#imgR <- getFrame(imgCr, 1)
+#imgG <- getFrame(imgCr, 2)
+
+#par(mfrow = c(1,2))
+#plot(imgR)
+#plot(imgG)
+```
+
+no cropping
+
+```{r}
+#imgCr = img[1:500, 1:500, 1:3]
 
 imgR <- getFrame(imgCr, 1)
 imgG <- getFrame(imgCr, 2)
@@ -31,18 +48,22 @@ plot(imgR)
 plot(imgG)
 plot(imgCr)
 
+imgRo <- imgR
+imgGo <- imgG
+
 ```
+
 
 offset subtraction 
 
 ```{r}
 
 par(mfrow = c(1,2))
-plot(imgG[436:463, 325:360]*4)
-plot(imgR[436:463, 325:360]*4)
+plot(imgG[948:975, 325:360]*4)
+plot(imgR[948:975, 325:360]*4)
 
-osR=mean(imgR[436:463, 325:360])
-osG=mean(imgG[436:463, 325:360])
+osR=mean(imgR[948:975, 325:360])
+osG=mean(imgG[948:975, 325:360])
 
 imgRo <- imgR - osR
 imgGo <- imgG - osG
@@ -70,7 +91,7 @@ tesing green subtractions
 imgGb <- imgGo - imgRo / 1
 #imgGb2 <- imgGo - thRb1
 
-par(mfrow = c(1,2))
+par(mfrow = c(2,1))
 #plot(imgGb2)
 plot(imgGb)
 plot(imgCr)
@@ -155,8 +176,6 @@ plot(imgCr *2)
 
 ```
 
-giving unique label to each cell 
-
 ```{r}
 
 Rlab <- bwlabel(thRb1)
@@ -167,7 +186,42 @@ GreenCells <- as.data.frame(computeFeatures.moment(Glab))
 
 ```
 
-creating function to overlay plot points on og image 
+```{r}
+imgT <- readImage("data/PAA48.tif")
+redT <- read.csv("data/redPAA48.csv")
+greenT <- read.csv("data/greenPAA48.csv")
+```
+
+
+
+```{r}
+
+plotontop <- function(img, red, green) {
+  
+  x <- flip(img *2)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = red$m.cx / dim(x)[1], y = red$m.cy / dim(x)[1], col = "red", pch = 1)
+  points(x = green$m.cx / dim(x)[1], y = green$m.cy / dim(x)[1], col = "blue", pch = 1)
+  
+}
+
+plotontop2 <- function(img, red, green) {
+  
+  x <- flip(img *2)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1))
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = red$XM / dim(x)[1], y = red$YM / dim(x)[1], col = "red", pch = 1)
+  points(x = green$XM / dim(x)[1], y = green$YM / dim(x)[1], col = "blue", pch = 1)
+  
+}
+```
 
 ```{r}
 plotontop <- function(img, red, green) {
@@ -182,24 +236,41 @@ plotontop <- function(img, red, green) {
   points(x = green$m.cx / dim(x)[1], y = green$m.cy / dim(x)[1], col = "blue", pch = 1)
   
 }
+
+plotontop2 <- function(img, red, green) {
+  
+  x <- flip(img *2)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp = 1)
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = red$XM / dim(x)[1], y = red$YM / dim(x)[1], col = "red", pch = 1)
+  points(x = green$XM / dim(x)[1], y = green$YM / dim(x)[1], col = "blue", pch = 1)
+  
+}
 ```
 
-plotting red and green extracted points on image 
+```{r}
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp = 1)
+rasterImage(img, 0, 0, 1, 0.5)
+
+
+#rasterImage(img, 0, 0, 1, dim(img)[2]/dim(img)[1])
+```
+
 
 ```{r}
 par(mfrow = c(1,1))
 
 plotontop(imgCr, RedCells, GreenCells)
+#pt <- plotontop2(imgT, redT, greenT)
 ```
 
 ```{r}
-writeImage(imgCr, file = "results/img.tiff", type = "tiff")
-write.csv(RedCells, file = "results/redcells.csv")
-write.csv(GreenCells, file = "results/greencells.csv")
+par(mfrow = c(1,1))
+plotontop(imgCr, RedCells, GreenCells)
+plotontop2(imgT, redT, greenT)
+plotontop2(img)
 ```
 
-
-
-
-
-find all points, calc distances between all points, if within certain small radius then remove and keep dead cell one 

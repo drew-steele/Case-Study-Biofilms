@@ -1,0 +1,117 @@
+---
+title: "spatial_stuff_messing_around"
+author: "Drew"
+date: "2024-02-25"
+output: html_document
+---
+
+```{r}
+#library(EBImage)
+library(spatstat)
+```
+
+```{r}
+
+living <- read.csv("results/livingCellsLoc.csv")
+dead <- read.csv("results/deadCellsLoc.csv")
+
+```
+
+data prep 
+
+```{r}
+living <- living[, c("m.cx", "m.cy")]
+living[,"condition"] <- "live"
+
+dead <- dead[, c("m.cx", "m.cy")]
+dead[,"condition"] <- "dead"
+
+fullcells <- rbind(living, dead)
+str(fullcells)
+```
+
+point pattern object 
+
+```{r}
+patAll <- ppp(fullcells[,1], fullcells[,2], c(0,1024), c(0,512)) # creating point pattaern object 
+marks(patAll) <- fullcells[,3] # adding infor on live dead - any extra info refered to as mark in spatstat
+anyDuplicated(patAll) # checking for duplicated poitns 
+plot(patAll)
+#summary(patAll)
+#plot(split(patAll))
+
+patDead <- ppp(dead[,1], dead[,2], c(0,1024), c(0,512)) # creating point pattaern object 
+anyDuplicated(patDead) # checking for duplicated poitns 
+plot(patDead)
+
+patLive <- ppp(living[,1], living[,2], c(0,1024), c(0,512)) # creating point pattaern object 
+anyDuplicated(patLive) # checking for duplicated poitns 
+plot(patLive)
+```
+
+Spatial randomness test 
+
+```{r}
+QAll <- quadratcount(patAll, nx = 20, ny = 10)
+plot(patAll)
+plot(QAll, add = TRUE, cex = 1)
+
+quadrat.test(QAll, alternative="two.sided")
+quadrat.test(QAll, alternative="regular")
+quadrat.test(QAll, alternative="clustered")
+
+QDead <- quadratcount(patDead, nx = 20, ny = 10)
+plot(patDead)
+plot(QDead, add = TRUE, cex = 1)
+
+quadrat.test(QDead, alternative="two.sided")
+quadrat.test(QDead, alternative="regular")
+quadrat.test(QDead, alternative="clustered")
+
+QLive <- quadratcount(patLive, nx = 20, ny = 10)
+plot(patLive)
+plot(QLive, add = TRUE, cex = 1)
+
+quadrat.test(QLive, alternative="two.sided")
+quadrat.test(QLive, alternative="regular")
+quadrat.test(QLive, alternative="clustered")
+```
+
+desnity tests 
+
+```{r}
+denAll <- density(patAll) # using default bandwith 
+attr(denAll, "sigma") # shows what bandwith defaulted to 
+
+plot(denAll, main = "Default bandwidth") # testing dif bandwiths 
+plot(density(patAll, sigma = 40))
+plot(density(patAll, sigma = 50))
+plot(density(patAll, sigma = 60))
+plot(patDead)
+
+denDead <- density(patDead)
+attr(denDead, "sigma")
+plot(denDead, main = "Default bandwidth")
+
+denLive <- density(patLive)
+attr(denLive, "sigma")
+plot(denLive, main = "Default bandwidth")
+```
+
+extracting density information for each point 
+
+```{r}
+
+denAll <- density(patAll, sigma = 64) # using default bandwith 
+denVal <- denAll[patAll] # extracting intensity values for each point 
+spatInf <- cbind(fullcells, denVal)
+
+mean(spatInf$denVal[spatInf$condition == "1"])
+mean(spatInf$denVal[spatInf$condition == "0"])
+
+par(mfrow = c(1,2))
+hist(spatInf$denVal[spatInf$condition == "0"])
+hist(spatInf$denVal[spatInf$condition == "1"])
+
+```
+

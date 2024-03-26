@@ -1,0 +1,146 @@
+---
+title: "channel_split"
+author: "Drew"
+date: "2024-01-19"
+output: html_document
+---
+
+```{r}
+library(EBImage)
+```
+
+```{r}
+img <- readImage("data/PAA3.tif")
+```
+
+```{r}
+display(img, method="browser")
+```
+
+
+```{r}
+imgCr = img[400:600, 100:300, 1:3]
+
+img1 <- getFrame(imgCr, 1)
+img2 <- getFrame(imgCr, 2)
+
+par(mfrow = c(1,3))
+plot(imgCr)
+plot(img1)
+plot(img2)
+```
+
+red image adjustments 
+
+```{r}
+
+imgR <- img1 - img2
+imgR <- (imgR + 0.1) 
+
+par(mfrow = c(1,3))
+plot(imgCr)
+plot(imgR)
+plot(img2)
+```
+
+green
+
+```{r}
+imgG <- (img2 * 1.5) ^ 1
+
+par(mfrow = c(1,3)) # comparing OG and altered
+plot(imgCr)
+plot(imgG)
+plot(img2)
+
+```
+
+creating kernal 
+
+```{r}
+k = matrix(-1, nrow = 3, ncol = 3) # creating matrix for filter
+k[2, 2] = 8 # setting centre as 8 
+k
+```
+
+red
+
+```{r}
+
+imgRS = EBImage::filter2(gblur(imgR,sigma=1),k) # applying filter 
+
+# imgRS <- imgRS * 2 # increasing contrast of output
+
+par(mfrow = c(1,3)) # comparing 
+plot(imgCr)
+plot(imgRS)
+plot(imgR)
+
+```
+
+```{r}
+# hist(imgRS)
+
+test <- imgRS > 0.1
+
+par(mfrow = c(1,3))
+plot(imgCr)
+plot(test)
+plot(imgR)
+
+
+test1 <- imgR@.Data
+```
+
+
+green
+
+```{r}
+
+imgGS = EBImage::filter2(gblur(imgG,sigma=1),k) # applying filter 
+
+imgGS <- imgGS * 2 # increasing contrast of output
+
+par(mfrow = c(1,3)) # comparing 
+plot(imgCr)
+plot(imgGS)
+plot(imgG)
+```
+
+
+```{r}
+
+colorMode(img1) = Grayscale
+colorMode(img2) = Grayscale
+
+OTH1 <- img1 > otsu(img1)
+OTH2 <- img2 > otsu(img2)
+
+plot(img1)
+plot(img2)
+
+plot(OTH1)
+plot(OTH2)
+
+```
+
+```{r}
+
+THimg <- thresh(imgG, w=5, h=5, offset=0.05)
+
+par(mfrow = c(1,3))
+plot(imgCr)
+plot(THimg)
+plot(test)
+
+```
+
+
+```{r}
+nmask = watershed( distmap(THimg), tolerance = 1, ext = 1)
+# display(colorLabels(nmask), all=TRUE)
+
+par(mfrow = c(1,2))
+plot(imgG)
+plot(colorLabels(nmask), all = T)
+```

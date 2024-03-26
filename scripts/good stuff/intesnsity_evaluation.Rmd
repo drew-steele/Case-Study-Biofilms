@@ -1,0 +1,91 @@
+---
+title: "intesnsity_evaluation"
+author: "Drew"
+date: "2024-03-06"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+```
+
+
+```{r}
+inputName <- "1_PAA_48_40_3"
+inputName2 <- "1_PAA_48_40_2"
+```
+
+
+```{r}
+
+living <- read.csv(paste0("results/segmentation/", inputName, "_live.csv"))
+dead <- read.csv(paste0("results/segmentation/", inputName, "_dead.csv"))
+
+cells <- rbind(living[,2:6], dead[,2:6])
+cells$condition <- as.factor(cells$condition)
+
+living2 <- read.csv(paste0("results/segmentation/", inputName2, "_live.csv"))
+dead2 <- read.csv(paste0("results/segmentation/", inputName2, "_dead.csv"))
+
+cells2 <- rbind(living2[,2:6], dead2[,2:6])
+cells2$condition <- as.factor(cells2$condition)
+
+bigCells <- rbind(cells, cells2)
+
+```
+
+```{r}
+test <- which(dead$redIntense > dead$greenIntense)
+dead$condition[test] <- "0"
+test <- which(dead$greenIntense > dead$redIntense)
+dead$condition[test] <- "1"
+
+test <- which(living$redIntense > living$greenIntense)
+living$condition[test] <- "0"
+test <- which(living$greenIntense > living$redIntense)
+living$condition[test] <- "1"
+
+tester <- rbind(dead, living)
+
+testD <- rbind(living[living$condition == "0" ,], dead[dead$condition == "0" ,])
+testL <- rbind(living[living$condition == "1" ,], dead[dead$condition == "1" ,])
+
+plotontop(img, testL, testD, "m.cx", "m.cy")
+plotontop(img, living, dead, "m.cx", "m.cy")
+```
+
+
+```{r}
+
+p1 <- ggplot(tester, mapping = aes(x = redIntense, y = greenIntense, colour = condition)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) 
+
+p2 <- ggplot(cells2, mapping = aes(x = redIntense, y = greenIntense, colour = condition)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) 
+
+grid.arrange(p1, p2, ncol=2)
+
+ggplot(bigCells, mapping = aes(x = redIntense, y = greenIntense, colour = condition)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) 
+
+```
+
+```{r}
+km.out <- kmeans(bigCells[,3:4], centers = 2, nstart = 50, algorithm = "MacQueen")
+km.out
+
+bigCells$clusId <- factor(km.out$cluster)
+
+ggplot(bigCells, mapping = aes(x = redIntense, y = greenIntense, colour = clusId)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) 
+```
+

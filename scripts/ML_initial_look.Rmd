@@ -1,0 +1,43 @@
+---
+title: "ML_initial_look"
+author: "Drew"
+date: "2024-02-08"
+output: html_document
+---
+
+```{r}
+install.packages("math")
+```
+
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+
+dead <- read.csv("results/deadInf.csv")
+live <- read.csv("results/livingInf.csv")
+
+allCells <- rbind(live, dead)
+allCells$condition <- as.factor(allCells$condition)
+str(allCells)
+
+```
+
+```{r}
+allCells$ratioN <- (allCells[, "aliveN"] +1) / (allCells[, "deadN"] +1)
+```
+
+
+```{r}
+
+ggplot(allCells, mapping = aes(x = aliveN, y = deadN, colour = condition)) +
+  geom_point() +
+  geom_jitter()
+
+ggplot(allCells, mapping = aes(x = m.cx, y = m.cy, colour = condition)) +
+  geom_point()
+
+```
+

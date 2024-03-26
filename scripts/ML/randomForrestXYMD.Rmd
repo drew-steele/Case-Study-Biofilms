@@ -1,0 +1,129 @@
+---
+title: "randomForrestXYMD"
+author: "Drew"
+date: "2024-03-04"
+output: html_document
+---
+
+
+```{r}
+
+library(randomForestSRC)
+library(caret)
+library(ROSE)
+library(imbalance)
+
+```
+
+defining variables 
+
+```{r}
+
+dir <- "results/cellInfo/"
+datName1 <- "1_NaClO_48_40_2"
+datName2 <- "1_NaClO_48_40_3"
+
+```
+
+loading data 
+
+```{r}
+
+dat1 <- read.csv(paste0(dir, datName1, ".All.Inf.csv"))
+  dat1$condition <- as.factor(dat1$condition)
+  dat1 <- dat1[, c("condition", "densityVal", "meanDist", "m.cx", "m.cy")]
+dat2 <- read.csv(paste0(dir, datName2, ".All.Inf.csv"))
+  dat2$condition <- as.factor(dat2$condition)
+  dat2 <- dat2[, c("condition", "densityVal", "meanDist", "m.cx", "m.cy")]
+  
+datAll <- rbind(dat1,dat2)  
+
+str(dat1)
+str(dat2)
+str(datAll)
+```
+
+spliting data 
+
+```{r}
+
+set.seed(101)
+
+## dat1
+
+index1 <- createDataPartition(dat1$condition, p = 0.7, list = FALSE) # taking 40% of data
+train1 <- dat1[index1, ]
+test1 <- dat1[-index1, ]
+
+sum(train1$condition == 0)
+sum(train1$condition == 1)
+sum(test1$condition == 0)
+sum(test1$condition == 1)
+
+## dat2
+
+index2 <- createDataPartition(dat2$condition, p = 0.7, list = FALSE) # taking 40% of data
+train2 <- dat2[index2, ]
+test2 <- dat2[-index2, ]
+
+sum(train2$condition == 0)
+sum(train2$condition == 1)
+sum(test2$condition == 0)
+sum(test2$condition == 1)
+
+## datAll
+
+indexAll <- createDataPartition(datAll$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainAll <- datAll[indexAll, ]
+testAll <- datAll[-indexAll, ]
+
+sum(trainAll$condition == 0)
+sum(trainAll$condition == 1)
+sum(testAll$condition == 0)
+sum(testAll$condition == 1)
+
+```
+
+
+```{r}
+mod.1 <- imbalanced(condition ~ ., train1, importance = T)
+mod.2 <- imbalanced(condition ~ ., train2, importance = T)
+mod.All <- imbalanced(condition ~ ., trainAll, importance = T)
+```
+
+evaluating models - all relevant  
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(mod.1)
+print(predict(mod.1, test1))
+print(predict(mod.1, dat2))
+plot(mod.1)
+mod1.sub <- subsample(mod.1, verbose = T)
+
+
+print(mod.2)
+print(predict(mod.2, test2))
+print(predict(mod.2, dat1))
+plot(mod.2)
+mod2.sub <- subsample(mod.2, verbose = T)
+
+
+print(mod.All)
+print(predict(mod.All, testAll))
+plot(mod.All)
+modAll.sub <- subsample(mod.All, verbose = T)
+
+par(mfrow = c(1,3))
+plot.subsample(mod1.sub, main = "Mod All 1")
+plot.subsample(mod2.sub, main = "Mod All 2")
+plot.subsample(modAll.sub, main = "Mod All All")
+
+par(mar = c(7,7,7,7))
+par(mfrow = c(1,1))
+plot.subsample(modAll.sub, main = "Variable Importance (VIMP)")
+
+```
+

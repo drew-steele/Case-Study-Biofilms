@@ -140,14 +140,14 @@ unable to get this working but not sure if good anyway as not a biomodal distrib
 
 ```{r}
 
-max(imgGo)
-min(imgGo)
+#max(imgGo)
+#min(imgGo)
 
-otsu(imgGo, range = c(-0.1260736, 0.7520985), levels = 255)
+#otsu(imgGo, range = c(-0.1260736, 0.7520985), levels = 255)
 
-par(mfrow = c(1,1))
-par(mar = c(3,3,3,3))
-hist(imgGo)
+#par(mfrow = c(1,1))
+#par(mar = c(3,3,3,3))
+#hist(imgGo)
 
 ```
 
@@ -268,3 +268,57 @@ nmask
 
 #display(colorLabels(nmaske2), all=TRUE)
 ```
+
+making red bolder 
+
+```{r}
+imgRb <- imgRo - imgGo /2.3
+
+par(mfrow = c(1,2))
+plot(imgRb)
+plot(imgCr)
+```
+
+edge detection - red only 
+
+```{r}
+imgRbe <- EBImage::filter2(gblur(imgRb,sigma=1.5),k)
+par(mfrow = c(1,2))
+plot(imgCr)
+plot(normalize(imgRbe))
+```
+
+adaptive thresh - red 
+
+```{r}
+thRb1 <- thresh(imgRbe, w=5, h=5, offset=0.04)
+thRb2 <- thresh(imgRbe, w=5, h=5, offset=0.036)
+thRb3 <- thresh(imgRbe, w=5, h=5, offset=0.033)
+
+par(mfrow = c(1,3))
+plot(imgRb)
+plot(thRb1)
+plot(imgCr *2)
+
+par(mfrow = c(1,3))
+plot(imgRb)
+plot(thRb2)
+plot(imgCr *2)
+
+par(mfrow = c(1,3))
+plot(imgRb)
+plot(thRb3)
+plot(imgCr *2)
+
+```
+
+```{r}
+plot(colorLabels(nmaske2))
+plot(thRb1)
+plot(imgGat3e2)
+
+green_o <- imgGat3e2 - thRb1
+
+plot(green_o)
+```
+

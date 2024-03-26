@@ -1,0 +1,41 @@
+---
+title: "presentation_figures"
+author: "Drew"
+date: "2024-02-26"
+output: html_document
+---
+
+red ratio stuff
+
+```{r}
+
+imgRb <- imgRo - (imgGo / rRatioValue)
+
+par(mfrow = c(3,1))
+display(imgRo, method = "raster")
+text(x = 20, y = 20, label = "Red Spectrum", adj = c(0,1), col = "green", cex = 1.8)
+display(imgRb, method = "raster")
+text(x = 20, y = 20, label = "Adjusted Red Spectrum", adj = c(0,1), col = "green", cex = 1.8)
+display(imgGo, method = "raster")
+text(x = 20, y = 20, label = "Green Spectrum", adj = c(0,1), col = "green", cex = 1.8)
+
+
+par(mfrow = c(2,1))
+display(imgRb, method = "raster")
+text(x = 20, y = 20, label = "Adjusted Red Spectrum", adj = c(0,1), col = "green", cex = 1.8)
+display(img, method = "raster")
+text(x = 20, y = 20, label = "Original Image", adj = c(0,1), col = "red", cex = 1.8)
+
+
+```
+
+watershed
+
+```{r}
+
+par(mfrow = c(1,1))
+display(colorLabels(nmaskR), method = "raster")
+text(x = 20, y = 20, label = "Dead cell watershed", adj = c(0,1), col = "green", cex = 1.8)
+
+```
+

@@ -1,0 +1,122 @@
+---
+title: "SVM_Model"
+author: "Drew"
+date: "2024-03-10"
+output: html_document
+---
+```{r}
+install.packages(c("GGally"), repos = "https://www.stats.bris.ac.uk/R/")
+```
+
+```{r}
+library("e1071")
+library(RColorBrewer) 
+library(tidyverse)   
+library(kernlab)     
+library(caret)
+library(ROSE)
+library(GGally)
+library(ggplot2)
+```
+
+```{r}
+set.seed(101)
+```
+
+defining variables 
+
+```{r}
+
+dir <- "results/newCellInfo/"
+datName1 <- "1_NaClO_48_40_2"
+datName2 <- "1_NaClO_48_40_3"
+
+```
+
+loading data 
+
+```{r}
+
+dat1 <- read.csv(paste0(dir, datName1, ".All.Inf.csv"))
+  dat1$condition <- as.factor(dat1$condition)
+  dat1 <- dat1[, c("condition", "densityVal", "NNdist....meanDist..", "liveMeanDist", 
+                   "deadMeanDist", "deadNV", "liveNV", "n.tri", "dir.area" )]
+dat2 <- read.csv(paste0(dir, datName2, ".All.Inf.csv"))
+  dat2$condition <- as.factor(dat2$condition)
+  dat2 <- dat2[, c("condition", "densityVal", "NNdist....meanDist..", "liveMeanDist", 
+                   "deadMeanDist", "deadNV", "liveNV", "n.tri", "dir.area" )]
+  
+datAll <- rbind(dat1,dat2)  
+
+str(dat1)
+str(dat2)
+str(datAll)
+```
+
+```{r}
+
+ggpairs(dat1[, 2:9], aes(color = dat1$condition))
+  
+```
+
+spliting data 
+
+```{r}
+
+set.seed(101)
+
+## dat1
+
+index1 <- createDataPartition(dat1$condition, p = 0.7, list = FALSE) # taking 40% of data
+train1 <- dat1[index1, ]
+test1 <- dat1[-index1, ]
+
+sum(train1$condition == 0)
+sum(train1$condition == 1)
+sum(test1$condition == 0)
+sum(test1$condition == 1)
+
+## dat2
+
+index2 <- createDataPartition(dat2$condition, p = 0.7, list = FALSE) # taking 40% of data
+train2 <- dat2[index2, ]
+test2 <- dat2[-index2, ]
+
+sum(train2$condition == 0)
+sum(train2$condition == 1)
+sum(test2$condition == 0)
+sum(test2$condition == 1)
+
+## datAll
+
+indexAll <- createDataPartition(datAll$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainAll <- datAll[indexAll, ]
+testAll <- datAll[-indexAll, ]
+
+sum(trainAll$condition == 0)
+sum(trainAll$condition == 1)
+sum(testAll$condition == 0)
+sum(testAll$condition == 1)
+
+```
+
+```{r}
+
+train1UO <- ovun.sample(condition~., data=dat1, p=0.5,
+                        seed=1, method="both")$data
+
+mod1 <- svm(condition ~ ., data = trainAll, kernel = "sigmoid", gamma = 1, cost = 1, scale = TRUE, class.weights = "inverse")
+
+summary(mod1)
+print(mod1)
+
+pred <- predict(mod1, testAll) 
+table(pred, testAll[, 1])
+
+pred <- predict(mod1, testAll, decision.values = TRUE)
+attr(pred, "decision.values")[1:12,]
+
+confusionMatrix(pred, testAll[,1])
+
+```
+

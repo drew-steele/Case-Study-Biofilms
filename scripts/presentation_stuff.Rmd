@@ -1,0 +1,166 @@
+---
+title: "presentation_stuff"
+author: "Drew"
+date: "2024-02-23"
+output: html_document
+---
+
+```{r}
+library(EBImage)
+```
+
+```{r}
+img <- readImage("data/trial2.tif")
+```
+
+```{r}
+display(img, method="browser")
+```
+
+cropping 
+
+```{r}
+imgCr = img[512:1024, 1:512, 1:3]
+imgR <- getFrame(imgCr, 1)
+imgG <- getFrame(imgCr, 2)
+
+par(mfrow = c(1,2))
+plot(imgG[436:463, 325:360]*4)
+plot(imgR[436:463, 325:360]*4)
+
+osR=mean(imgR[436:463, 325:360])
+osG=mean(imgG[436:463, 325:360])
+
+imgRo <- imgR - osR
+imgGo <- imgG - osG
+
+par(mfrow = c(2,2))
+plot(imgR)
+plot(imgRo)
+plot(imgG)
+plot(imgGo)
+
+```
+
+offset subtraction - cropped 
+
+```{r}
+
+imgCr <- img
+imgR <- getFrame(imgCr, 1)
+imgG <- getFrame(imgCr, 2)
+
+par(mfrow = c(1,2))
+plot(imgG[948:975, 325:360]*4)
+plot(imgR[948:975, 325:360]*4)
+
+osR=mean(imgR[948:975, 325:360])
+osG=mean(imgG[948:975, 325:360])
+
+imgRo <- imgR - osR
+imgGo <- imgG - osG
+
+par(mfrow = c(2,2))
+plot(imgR)
+plot(imgRo)
+plot(imgG)
+plot(imgGo)
+```
+
+blur
+
+```{r}
+
+blurRm <- medianFilter(imgRo, 2)
+blurGm <- medianFilter(imgGo, 2)
+blurRg <- gblur(imgRo, sigma = 2)
+blurGg <- gblur(imgGo, sigma = 2)
+
+par(mfrow = c(1,2))
+plot(blurRm)
+plot(blurRg)
+
+par(mfrow = c(1,2))
+plot(blurGm)
+plot(blurGg)
+```
+
+
+edge detection - 1
+
+```{r}
+Shoriz <- matrix(c(1, 2, 1, 0, 0, 0, -1, -2, -1), nrow = 3)
+Svert <- t(Shoriz)
+
+# get horizontal and vertical edges
+imgHr <- filter2(imgRo, Shoriz)
+imgVr <- filter2(imgRo, Svert)
+
+# combine edge pixel data to get overall edge data
+hdataR <- imageData(imgHr)
+vdataR <- imageData(imgVr)
+edataR <- sqrt(hdataR^2 + vdataR^2)
+
+# transform edge data to image
+imgRe <- Image(edataR)
+# print(display(combine(img, imgH, imgV, imgE), method = "raster", all = T))
+
+par(mfrow = c(1,2))
+plot(imgCr)
+plot(imgRe)
+
+# get horizontal and vertical edges
+imgHg <- filter2(imgGo, Shoriz)
+imgVg <- filter2(imgGo, Svert)
+
+# combine edge pixel data to get overall edge data
+hdataG <- imageData(imgHg)
+vdataG <- imageData(imgVg)
+edataG <- sqrt(hdataG^2 + vdataG^2)
+
+# transform edge data to image
+imgGe <- Image(edataG)
+# print(display(combine(img, imgH, imgV, imgE), method = "raster", all = T))
+
+par(mfrow = c(1,2))
+plot(imgCr)
+plot(imgGe)
+```
+
+edge detection - 2
+
+```{r}
+
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+
+imgRe2 <- EBImage::filter2(gblur(imgRo,sigma=1.5),k)
+par(mfrow = c(1,2))
+plot(imgCr)
+plot(normalize(imgRe2))
+
+imgGe2 <- EBImage::filter2(gblur(imgGo,sigma=1.5),k)
+par(mfrow = c(1,2))
+plot(imgCr)
+plot(normalize(imgGe2))
+
+```
+
+edge plotting 
+
+```{r}
+
+par(mfrow = c(1,2))
+display(normalize(imgGe2), method = "raster")
+text(x = 20, y = 20, label = "Test", adj = c(0,1), col = "green", cex = 2)
+display(imgGe, method="raster")
+text(x = 20, y = 20, label = "Shoriz", adj = c(0,1), col = "green", cex = 2)
+```
+
+thresholding 
+
+```{r}
+
+```
+

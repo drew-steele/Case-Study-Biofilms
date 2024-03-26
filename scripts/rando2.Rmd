@@ -1,0 +1,103 @@
+---
+title: "clean_code"
+author: "Drew"
+date: "2024-01-19"
+output: html_document
+---
+
+
+```{r}
+library(EBImage)
+library(colocr) # colocalisation analyis package 
+```
+
+```{r}
+img <- readImage("data/PAA2.tif")
+```
+
+```{r}
+display(img, method="browser")
+```
+
+increasing contrast and gamma 
+
+```{r}
+#imgB <- img - 0.1
+imgG <- (img * 1.5) ^ 1.2 # increasing contrast and gamma 
+imgG = imgG[100:300, 100:300, 1:3] # cropping image for easier analysis of process
+imgCr = img[100:300, 100:300, 1:3]
+
+par(mfrow = c(1,2)) # comparing OG and altered
+plot(imgG)
+plot(imgCr)
+
+```
+
+```{r}
+k = matrix(-1, nrow = 3, ncol = 3) # creating matrix for filter
+k[2, 2] = 8 # setting centre as 8 
+k
+Geimg = EBImage::filter2(gblur(imgG,sigma=1),k) # applying filter 
+
+test <- Geimg * 2 # increasing contrast of output
+
+par(mfrow = c(1,2)) # comparing 
+plot(test)
+plot(imgG)
+```
+
+```{r}
+img1 <- getFrame(imgCr, 1)
+img2 <- getFrame(imgCr, 2)
+
+par(mfrow = c(2,1))
+plot(img1)
+plot(img2)
+```
+
+```{r}
+Ronly <- img1 - img2
+Ronly <- Ronly * 5
+
+Gonly <- img2 - img1
+
+par(mfrow = c(1,3))
+plot(Gonly * 2)
+plot(imgCr * 3)
+plot(Ronly)
+```
+
+
+```{r}
+
+colorMode(img1) = Grayscale
+colorMode(img2) = Grayscale
+
+OTH1 <- img1 > otsu(img1)
+OTH2 <- img2 > otsu(img2)
+
+plot(img1)
+plot(img2)
+
+plot(OTH1)
+plot(OTH2)
+
+```
+
+```{r}
+display(thresh(test, w=10, h=10, offset=0.15), all=TRUE )
+
+THimg <- thresh(test, w=10, h=10, offset=0.15)
+plot(THimg)
+plot(test)
+```
+
+
+```{r}
+nmask = watershed( distmap(THimg), tolerance = 1, ext = 1)
+# display(colorLabels(nmask), all=TRUE)
+
+par(mfrow = c(1,2))
+plot(imgG)
+plot(colorLabels(nmask), all = T)
+```

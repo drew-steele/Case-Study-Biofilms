@@ -1,0 +1,145 @@
+---
+title: "randomForrest"
+author: "Drew"
+date: "2024-02-25"
+output: html_document
+---
+
+```{r}
+set.seed(101)
+```
+
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(caret)
+library(randomForest)
+library(ROSE)
+```
+
+
+```{r}
+
+dead <- read.csv("results/deadInf.csv")
+live <- read.csv("results/livingInf.csv")
+
+allCells <- rbind(live, dead)
+allCells$condition <- as.factor(allCells$condition)
+allCells$ratioN <- (allCells[, "aliveN"] +1) / (allCells[, "deadN"] +1)
+allCells <- allCells[,2:13]
+
+str(allCells)
+
+```
+
+exploring data 
+
+```{r}
+
+plot1 <- ggplot(allCells, mapping = aes(x = aliveN, y = deadN, colour = condition)) +
+            geom_point() +
+            ggtitle("x = aliveN, y = deadN") +
+            geom_jitter()
+
+plot2 <- ggplot(allCells, mapping = aes(x = ratioN, y = meanDist, colour = condition)) +
+            geom_point() +
+            ggtitle("x = ratioN, y = meanDist") +
+            geom_jitter()
+
+plot3 <- ggplot(allCells, mapping = aes(x = ratioN, y = densityVal, colour = condition)) +
+            geom_point() +
+            ggtitle("x = ratioN, y = densityVal") +
+            geom_jitter()
+
+plot4 <- ggplot(allCells, mapping = aes(x = ratioN, y = dist.1, colour = condition)) +
+            geom_point() +
+            ggtitle("x = ratioN, y = dist.1") +
+            geom_jitter()
+
+grid.arrange(plot1, plot2, plot3, plot4, nrow = 2)
+
+
+```
+
+splitting data 
+
+```{r}
+
+data <- allCells[, c(1:7, 12)] # takign relevant preductirs 
+
+index <- createDataPartition(data$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainD <- data[index, ]
+testD <- data[-index, ]
+
+sum(trainD$condition == 0)
+sum(trainD$condition == 1)
+
+```
+
+creating model
+
+```{r}
+
+rf <- randomForest(condition~., data=trainD, proximity=TRUE) 
+print(rf)
+
+```
+
+testing model 
+
+```{r}
+
+p1 <- predict(rf, trainD)
+confusionMatrix(p1, trainD$condition)
+
+p2 <- predict(rf, testD)
+confusionMatrix(p2, testD$condition)
+
+```
+
+splitting data - over + under sampling 
+
+```{r}
+
+dataBalance <- ovun.sample(condition~., data=data, p=0.5,
+                        seed=1, method="both")
+
+dataBalance <- ovun.sample(condition~., data=trainD, p=0.5,
+                        seed=1, method="both")$data
+
+sum(dataBalance$condition == "0")
+sum(dataBalance$condition == "1")
+
+```
+
+creating model
+
+```{r}
+
+rfBal <- randomForest(condition~., data=dataBalance, proximity=TRUE) 
+
+```
+
+testing model 
+
+```{r}
+
+p1Bal <- predict(rfBal, trainD)
+confusionMatrix(p1Bal, trainD$condition)
+
+p2Bal <- predict(rfBal, testD)
+confusionMatrix(p2Bal, testD$condition)
+
+```
+
+evaluating model 
+
+```{r}
+
+print(rfBal)
+plot(rfBal)
+importance(rfBal)
+
+```
+

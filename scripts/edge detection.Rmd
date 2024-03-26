@@ -1,0 +1,70 @@
+---
+title: "colocalization_analysis"
+author: "Drew"
+date: "2024-01-20"
+output: html_document
+---
+
+```{r}
+install.packages("colocr", repos = "https://cran.ma.imperial.ac.uk/")
+install.packages("shinyBS", repos = "https://cran.ma.imperial.ac.uk/")
+```
+
+```{r}
+library(colocr) # colocalisation analyis package 
+library(shinyBS)
+```
+
+```{r}
+img <- readImage("data/PAA2.tif")
+fl <- system.file("data", "PAA2.tif", package = "colocr")
+img <- image_load("data/PAA2.tif")
+```
+
+```{r}
+display(img, method="browser")
+```
+
+```{r}
+colocr_app()
+```
+
+```{r}
+Shoriz <- matrix(c(1, 2, 1, 0, 0, 0, -1, -2, -1), nrow = 3)
+Svert <- t(Shoriz)
+
+# get horizontal and vertical edges
+imgH <- filter2(imgCr, Shoriz)
+imgV <- filter2(imgCr, Svert)
+
+# combine edge pixel data to get overall edge data
+hdata <- imageData(imgH)
+vdata <- imageData(imgV)
+edata <- sqrt(hdata^2 + vdata^2)
+
+# transform edge data to image
+imgE <- Image(edata, colormode = 2)
+# print(display(combine(img, imgH, imgV, imgE), method = "raster", all = T))
+
+par(mfrow = c(1,2))
+plot(imgCr)
+plot(imgE)
+```
+
+```{r}
+
+img1 <- getFrame(imgE, 1)
+img2 <- getFrame(imgE, 2)
+
+par(mfrow = c(1,3))
+plot(imgE)
+plot(img1)
+plot(img2)
+
+Ronly <- img1 - img2
+plot(Ronly*3)
+plot(imgCr)
+```
+
+```
+
