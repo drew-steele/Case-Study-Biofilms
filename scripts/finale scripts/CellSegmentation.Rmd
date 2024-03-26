@@ -1,0 +1,410 @@
+---
+title: "cell_segmentation_script"
+author: "Drew"
+date: "2024-02-24"
+output: html_document
+---
+
+```{r}
+library(EBImage)
+library(spatstat)
+library(ggplot2)
+library(gridExtra)
+```
+
+defining functions 
+
+```{r}
+plotontop <- function(img, cells, red, xcord, ycord) {
+  
+  x <- flip(img *2)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp =1)
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = cells[,xcord] / dim(x)[1], y = cells[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 0.2)
+  points(x = red[,xcord] / dim(x)[1], y = red[,ycord] / dim(x)[1], col = "red", pch = 1, cex = 0.2)
+}
+```
+
+defining variable names 
+
+```{r}
+inputDir <- "data/1344_48h_Repeat Oct 2020"
+inputName <- "1344 40min PAA 48hrs 2"
+outputName <- "1_PAA_48_40_2"
+```
+
+load original segmentation + image and view 
+
+```{r}
+OGgreen <- read.csv(paste0(inputDir, "/", inputName, ".green.csv"))
+OGred <- read.csv(paste0(inputDir, "/", inputName, ".red.csv"))
+
+img <- readImage(paste0(inputDir, "/", inputName, ".tif"))
+display(flip(img *2), method="browser")
+display(img *2, method="browser")
+```
+
+defining script variables and which parts to run
+
+```{r}
+thGvalue <- 0.025
+thRvalue <- 0.04
+rRatioValue <- 1.9
+
+thGloop <- "n"
+thRloop <- "n"
+rRatioLoop <- "n"
+offsetPos <- "y"
+
+saveOut <- "n"
+
+offsetRegion <- "619:639, 441:461"
+```
+
+split colour channels 
+
+```{r}
+
+imgR <- getFrame(img, 1)
+imgG <- getFrame(img, 2)
+
+par(mfrow = c(3,1))
+plot(imgR)
+plot(imgG)
+plot(img)
+
+```
+
+offset subtraction - cropped 
+
+```{r}
+
+if(offsetPos == "y") {
+  
+  par(mfrow = c(1,2))
+  plot(imgG[948:975, 325:360]*4)
+  plot(imgR[948:975, 325:360]*4)
+
+  osR=mean(imgR[948:975, 325:360])
+  osG=mean(imgG[948:975, 325:360])
+
+  imgRo <- imgR - osR # subtracting mean intensity from full image 
+  imgGo <- imgG - osG
+
+  par(mfrow = c(2,2))
+  plot(imgR)
+  plot(imgRo)
+  plot(imgG)
+  plot(imgGo)
+
+} else {
+  
+  cat("no offset possible")
+  
+  imgRo <- imgR
+  imgGo <- imgG
+  
+}
+```
+
+explore image 
+
+```{r}
+
+par(mar = c(5,5,5,5))
+par(mfrow = c(2,2))
+
+hist(imgRo)
+imgRo
+
+hist(imgGo)
+imgGo
+
+hist(img)
+img
+
+```
+
+### segmenting live cells 
+
+edge detection
+
+```{r}
+
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+
+imgGe <- EBImage::filter2(gblur(imgGo,sigma=1.5),k)
+par(mfrow = c(2,1))
+#plot(img)
+#plot(normalize(imgGe))
+
+```
+
+adaptive thresholding - exploring offset 
+
+```{r}
+
+if(thGloop == "y") {
+  
+  for (i in seq(from = 0.005, to = 0.05, by = 0.005)) {
+  
+    x <- thresh(imgGe, w=5, h=5, offset= i)
+  
+    par(mfrow = c(2,1))
+    display(x, method="raster")
+    text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
+    display(img * 2, method="raster")
+    text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+  
+  }
+} else {
+  cat("green threshold loop not run")
+}
+
+```
+
+selecting best method 
+
+```{r}
+
+imgGth <- thresh(imgGe, w=5, h=5, offset = thGvalue)
+#plot(imgGth)
+
+```
+
+watershed algorithm 
+
+```{r}
+
+nmaskG <- watershed(EBImage::distmap(imgGth), tolerance = 1, ext = 1)
+
+#display(colorLabels(nmaskG), all=TRUE)
+
+par(mfrow = c(2,1))
+plot(colorLabels(nmaskG))
+plot(img * 2)
+
+```
+
+### extracting red cells 
+
+highlighting red cells - explorign values 
+
+```{r}
+
+if(rRatioLoop == "y") {
+  
+  for (i in seq(from = 1, to = 3, by = 0.1 )) {
+
+    x <- imgRo - (imgGo / i)
+
+    par(mfrow = c(2,1))
+    display(x * 2, method="raster")
+    text(x = 20, y = 20, label = paste("ratio = ", i), adj = c(0,1), col = "green", cex = 1.5)
+    display(img * 2, method="raster")
+    text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+
+  }
+} else {
+  cat("red ratio loop not run")
+}
+
+imgRb <- imgRo - (imgGo / rRatioValue)
+
+```
+
+edge detection - red only 
+
+```{r}
+
+k = matrix(-1, nrow = 3, ncol = 3)
+k[2, 2] = 8
+k
+
+imgRe <- EBImage::filter2(gblur(imgRb,sigma=1.5),k)
+par(mfrow = c(2,1))
+#plot(img)
+#plot(normalize(imgRe))
+
+```
+
+adaptive thresholding - exploring offset 
+
+```{r}
+
+if(thRloop == "y") {
+  
+  for (i in seq(from = 0.005, to = 0.05, by = 0.005)) {
+  
+    x <- thresh(imgRe, w=5, h=5, offset= i)
+  
+    par(mfrow = c(2,1))
+    display(x, method="raster")
+    text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
+    display(img * 2, method="raster")
+    text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+  
+  }
+} else {
+  cat("red threshold loop not run")
+}
+
+```
+
+adaptive thresholding - selecting best method 
+
+```{r}
+
+imgRth <- thresh(imgRe, w=5, h=5, offset= thRvalue)
+#plot(imgRth)
+
+```
+
+watershed
+
+```{r}
+
+nmaskR <- watershed(EBImage::distmap(imgRth), tolerance = 1, ext = 1)
+
+#nmaskR <- bwlabel(imgRth)
+
+#display(colorLabels(nmaskR), all=TRUE)
+
+par(mfrow = c(2,1))
+plot(colorLabels(nmaskR))
+plot(img * 2)
+
+```
+
+extracting intenstiy values 
+
+```{r}
+
+IntValDeadR <- as.data.frame(computeFeatures.basic(nmaskR, imgRo)[,1:2])
+IntValDeadG <- as.data.frame(computeFeatures.basic(nmaskR, imgGo)[,1:2])
+
+IntValLiveR <- as.data.frame(computeFeatures.basic(nmaskG, imgRo)[,1:2])
+IntValLiveG <- as.data.frame(computeFeatures.basic(nmaskG, imgGo)[,1:2])
+
+```
+
+organising outputs
+
+```{r}
+cellLocR <- as.data.frame(cbind(computeFeatures.moment(nmaskR)[,1:2], IntValDeadR, IntValDeadG))
+cellLocR$condition <- "0"
+colnames(cellLocR) <- c("m.cx", "m.cy","redMeanInts", "redSDInts", "greenMeanInts", "greenSDInts", "condition")
+
+cellLocG <- as.data.frame(cbind(computeFeatures.moment(nmaskG)[,1:2], IntValLiveR, IntValLiveG))
+cellLocG$condition <- "1"
+colnames(cellLocG) <- c("m.cx", "m.cy","redMeanInts", "redSDInts", "greenMeanInts", "greenSDInts", "condition")
+
+cellLocFull <- rbind(cellLocR, cellLocG)
+```
+
+calculating nearest neighbour and selecting those closet together 
+
+```{r}
+
+cellLocFull$NN_dist <- nndist(cellLocFull[, 1:2])
+
+cellLocR$NN_dist <- nndist(cellLocR[, 1:2])
+cellLocG$NN_dist <- nndist(cellLocG[, 1:2])
+
+```
+
+examining dist data
+
+```{r}
+par(mar = c(4,4,4,4))
+par(mfrow = c(2,2))
+
+min(cellLocFull$NN_dist)
+max(cellLocFull$NN_dist)
+hist(cellLocFull$NN_dist)
+
+min(cellLocR$NN_dist)
+max(cellLocR$NN_dist)
+hist(cellLocR$NN_dist)
+
+min(cellLocG$NN_dist)
+max(cellLocG$NN_dist)
+hist(cellLocG$NN_dist)
+
+```
+
+combining cell coords with distance - removing close points 
+
+```{r}
+
+cellLocGadj <- as.data.frame(cellLocFull[cellLocFull$condition == "1" & cellLocFull$NN_dist > min(cellLocG$NN_dist),])
+
+cellLocFullAdj <- rbind(cellLocGadj,cellLocR)
+
+```
+
+exaimining first segmentation
+
+```{r}
+
+par(mfrow = c(1,1))
+
+plotontop(img, cellLocGadj, cellLocR, "m.cx", "m.cy") # examining my segmentation 
+
+plotontop(img, OGgreen, OGred, "XM", "YM") # comparing to original 
+
+```
+
+setting threshold cutoff 
+
+```{r}
+
+deadSet <- which(cellLocFullAdj$redMeanInts / cellLocFullAdj$greenMeanInts > 0.9)
+liveSet <- which(cellLocFullAdj$redMeanInts / cellLocFullAdj$greenMeanInts < 0.9)
+
+cellLocFullAdj$condition[deadSet] <- "0" 
+cellLocFullAdj$condition[liveSet] <- "1" 
+
+```
+
+viewing adjusted segmentation 
+
+```{r}
+
+par(mfrow = c(1,1))
+
+plotontop(img, cellLocFullAdj[cellLocFullAdj$condition == "1" ,], cellLocFullAdj[cellLocFullAdj$condition == "0" ,], "m.cx", "m.cy") # examining my segmentation 
+
+p1 <- ggplot(rbind(cellLocGadj,cellLocR), mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) 
+
+p2 <- ggplot(cellLocFullAdj, mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) 
+
+grid.arrange(p1, p2, ncol = 2)
+
+```
+
+### saving output 
+
+```{r}
+if(saveOut == "y") {
+  
+  write.csv(cellLocFullAdj, paste0("results2/segmentationAdj/", outputName, ".csv"))
+
+  write.table(c(thGvalue, thRvalue, rRatioValue, offsetRegion, sum(imgRo), sum(imgGo)), 
+              paste0("results2/segmentationAdj/", outputName, "_values.txt"), sep = "\t")
+  
+} else {
+  cat("not saved")
+}
+```
