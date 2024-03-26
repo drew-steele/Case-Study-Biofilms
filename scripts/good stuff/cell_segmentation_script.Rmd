@@ -8,6 +8,8 @@ output: html_document
 ```{r}
 library(EBImage)
 library(spatstat)
+library(ggplot2)
+library(gridExtra)
 ```
 
 defining functions 
@@ -55,7 +57,7 @@ rRatioValue <- 1.5
 thGloop <- "n"
 thRloop <- "n"
 rRatioLoop <- "n"
-offsetPos <- "n"
+offsetPos <- "y"
 
 saveOut <- "n"
 
@@ -279,57 +281,40 @@ plot(img * 2)
 
 ```
 
-### inspection of segmentations so far
-
-saving outputs 
+extracting intenstiy values 
 
 ```{r}
-cellLocR <- as.data.frame(computeFeatures.moment(nmaskR))
-cellLocG <- as.data.frame(computeFeatures.moment(nmaskG))
+
+IntValDeadR <- as.data.frame(computeFeatures.basic(nmaskR, imgRo)[,1:2])
+IntValDeadG <- as.data.frame(computeFeatures.basic(nmaskR, imgGo)[,1:2])
+
+IntValLiveR <- as.data.frame(computeFeatures.basic(nmaskG, imgRo)[,1:2])
+IntValLiveG <- as.data.frame(computeFeatures.basic(nmaskG, imgGo)[,1:2])
+
 ```
 
-plotting segmentation
+organising outputs
 
 ```{r}
-#par(mfrow = c(1,1))
+cellLocR <- as.data.frame(cbind(computeFeatures.moment(nmaskR)[,1:2], IntValDeadR, IntValDeadG))
+cellLocR$condition <- "0"
+colnames(cellLocR) <- c("m.cx", "m.cy","redMeanInts", "redSDInts", "greenMeanInts", "greenSDInts", "condition")
 
-#plotontop(img, cellLocG, cellLocR, "m.cx", "m.cy")
-```
+cellLocG <- as.data.frame(cbind(computeFeatures.moment(nmaskG)[,1:2], IntValLiveR, IntValLiveG))
+cellLocG$condition <- "1"
+colnames(cellLocG) <- c("m.cx", "m.cy","redMeanInts", "redSDInts", "greenMeanInts", "greenSDInts", "condition")
 
-plotting original segmentation 
-
-```{r}
-#par(mfrow = c(1,1))
-
-#plotontop(img, OGgreen, OGred, "XM", "YM")
-```
-
-### removing duplicated cells 
-
-manipulating data
-
-```{r}
-dead <- cellLocR[,1:2]
-dead[,3] <- "0"
-
-living <- cellLocG[,1:2]
-living[,3] <- "1"
- 
-cells <- rbind(dead, living)
-colnames(cells) <- c("m.cx", "m.cy", "condition")
+cellLocFull <- rbind(cellLocR, cellLocG)
 ```
 
 calculating nearest neighbour and selecting those closet together 
 
 ```{r}
 
-NN_which <- nnwhich(cells)
-NN_dist <- nndist(cells)
+cellLocFull$NN_dist <- nndist(cellLocFull[, 1:2])
 
-NN_dist_live <- nndist(living)
-NN_dist_dead <- nndist(dead)
-
-NN_all <- as.data.frame(cbind(NN_which, NN_dist))
+cellLocR$NN_dist <- nndist(cellLocR[, 1:2])
+cellLocG$NN_dist <- nndist(cellLocG[, 1:2])
 
 ```
 
@@ -339,17 +324,17 @@ examining dist data
 par(mar = c(4,4,4,4))
 par(mfrow = c(2,2))
 
-min(NN_all$NN_dist)
-max(NN_all$NN_dist)
-hist(NN_all$NN_dist)
+min(cellLocFull$NN_dist)
+max(cellLocFull$NN_dist)
+hist(cellLocFull$NN_dist)
 
-min(NN_dist_live)
-max(NN_dist_live)
-hist(NN_dist_live)
+min(cellLocR$NN_dist)
+max(cellLocR$NN_dist)
+hist(cellLocR$NN_dist)
 
-min(NN_dist_dead)
-max(NN_dist_dead)
-hist(NN_dist_dead)
+min(cellLocG$NN_dist)
+max(cellLocG$NN_dist)
+hist(cellLocG$NN_dist)
 
 ```
 
@@ -357,24 +342,55 @@ combining cell coords with distance - removing close points
 
 ```{r}
 
-min(NN_dist_live) # checking smallest distance between all cells
-min(NN_dist_dead) # checking smallest distance between all cells
+cellLocGadj <- as.data.frame(cellLocFull[cellLocFull$condition == "1" & cellLocFull$NN_dist > min(cellLocG$NN_dist),])
 
-cellDists <- cbind(cells, NN_all)
-
-cellLocLive <- as.data.frame(cellDists[cellDists$condition == "1" & cellDists$NN_dist > min(NN_dist_live),])
+cellLocFullAdj <- rbind(cellLocGadj,cellLocR)
 
 ```
 
-exaimining final segmentation 
+exaimining first segmentation
 
 ```{r}
 
 par(mfrow = c(1,1))
 
-plotontop(img, cellLocLive, cellLocR, "m.cx", "m.cy") # examining my segmentation 
+plotontop(img, cellLocGadj, cellLocR, "m.cx", "m.cy") # examining my segmentation 
 
 plotontop(img, OGgreen, OGred, "XM", "YM") # comparing to original 
+
+```
+
+setting threshold cutoff 
+
+```{r}
+
+deadSet <- which(cellLocFullAdj$redMeanInts / cellLocFullAdj$greenMeanInts > 0.9)
+liveSet <- which(cellLocFullAdj$redMeanInts / cellLocFullAdj$greenMeanInts < 0.9)
+
+cellLocFullAdj$condition[deadSet] <- "0" 
+cellLocFullAdj$condition[liveSet] <- "1" 
+
+```
+
+viewing adjusted segmentation 
+
+```{r}
+
+par(mfrow = c(1,1))
+
+plotontop(img, cellLocFullAdj[cellLocFullAdj$condition == "1" ,], cellLocFullAdj[cellLocFullAdj$condition == "0" ,], "m.cx", "m.cy") # examining my segmentation 
+
+p1 <- ggplot(rbind(cellLocGadj,cellLocR), mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) 
+
+p2 <- ggplot(cellLocFullAdj, mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) 
+
+grid.arrange(p1, p2, ncol = 2)
 
 ```
 
@@ -383,8 +399,7 @@ plotontop(img, OGgreen, OGred, "XM", "YM") # comparing to original
 ```{r}
 if(saveOut == "y") {
   
-  write.csv(cellLocLive, paste0("results/segmentation/", outputName, "_live.csv"))
-  write.csv(cellLocR, paste0("results/segmentation/", outputName, "_dead.csv"))
+  write.csv(cellLocFullAdj, paste0("results/segmentation/", outputName, ".csv"))
 
   write.table(c(thGvalue, thRvalue, rRatioValue, offsetRegion), paste0("results/segmentation/", outputName, "_values.txt"), sep = "\t")
   
@@ -392,4 +407,3 @@ if(saveOut == "y") {
   cat("not saved")
 }
 ```
-
