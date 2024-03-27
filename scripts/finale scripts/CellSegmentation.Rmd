@@ -23,17 +23,17 @@ plotontop <- function(img, cells, red, xcord, ycord, title) {
   plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp =1, main = paste(title))
   
   rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
-  points(x = cells[,xcord] / dim(x)[1], y = cells[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 0.2)
-  points(x = red[,xcord] / dim(x)[1], y = red[,ycord] / dim(x)[1], col = "red", pch = 1, cex = 0.2)
+  points(x = cells[,xcord] / dim(x)[1], y = cells[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 1)
+  points(x = red[,xcord] / dim(x)[1], y = red[,ycord] / dim(x)[1], col = "red", pch = 1, cex = 1)
 }
 ```
 
 defining variable names 
 
 ```{r}
-inputDir <- "data/1344_48h_Repeat Oct 2020"
-inputName <- "1344 40min PAA 48hrs 2"
-outputName <- "1_48_PAA_40_2"
+inputDir <- "data/3750_24h_Repeat Oct 2020"
+inputName <- "3750 20min PAA 24hrs 1"
+outputName <- "1_24_H2O2_20_3"
 ```
 
 load original segmentation + image and view 
@@ -51,17 +51,19 @@ defining script variables and which parts to run
 
 ```{r}
 thGvalue <- 0.025
-thRvalue <- 0.04
-rRatioValue <- 1.9
+thRvalue <- 0.045
+rRatioValue <- 1.4
+gblurVal <- 3
 
-thGloop <- "n"
-thRloop <- "n"
+thGloop <- "y"
+thRloop <- "y"
 rRatioLoop <- "n"
-offsetPos <- "y"
+offsetPos <- "n"
+# gblurNeed <- "n"
 
 saveOut <- "n"
 
-offsetRegion <- "619:639, 441:461"
+offsetRegion <- "350:370, 477:497"
 ```
 
 split colour channels 
@@ -85,11 +87,11 @@ offset subtraction - cropped
 if(offsetPos == "y") {
   
   par(mfrow = c(1,2))
-  plot(imgG[619:639, 441:461]*4)
-  plot(imgR[619:639, 441:461]*4)
+  plot(imgG[350:370, 477:497]*4)
+  plot(imgR[350:370, 477:497]*4)
 
-  osR=mean(imgR[619:639, 441:461])
-  osG=mean(imgG[619:639, 441:461])
+  osR=mean(imgR[350:370, 477:497])
+  osG=mean(imgG[350:370, 477:497])
 
   imgRo <- normalize(imgR - osR, ft=c(0,1)) # subtracting mean intensity from full image 
   imgGo <- normalize(imgG - osG, ft=c(0,1))
@@ -138,10 +140,10 @@ k = matrix(-1, nrow = 3, ncol = 3)
 k[2, 2] = 8
 k
 
-imgGe <- EBImage::filter2(gblur(imgGo,sigma=1.5),k)
+imgGe <- EBImage::filter2(gblur(imgGo,sigma=gblurVal),k)
 par(mfrow = c(2,1))
-#plot(img)
-#plot(normalize(imgGe))
+plot(img)
+plot(normalize(imgGe))
 
 ```
 
@@ -355,7 +357,9 @@ combining cell coords with distance - removing close points
 
 ```{r}
 
-cellLocGadj <- as.data.frame(cellLocFull[cellLocFull$condition == "1" & cellLocFull$NN_dist > min(cellLocG$NN_dist),])
+min_NN_dist <- min(min(cellLocG$NN_dist), min(cellLocR$NN_dist))
+
+cellLocGadj <- as.data.frame(cellLocFull[cellLocFull$condition == "1" & cellLocFull$NN_dist > min_NN_dist,])
 
 cellLocFullAdj <- rbind(cellLocGadj,cellLocR)
 
