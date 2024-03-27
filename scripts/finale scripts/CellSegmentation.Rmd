@@ -6,21 +6,21 @@ output: html_document
 ---
 
 ```{r}
-library(EBImage)
 library(spatstat)
 library(ggplot2)
 library(gridExtra)
+library(EBImage)
 ```
 
 defining functions 
 
 ```{r}
-plotontop <- function(img, cells, red, xcord, ycord) {
+plotontop <- function(img, cells, red, xcord, ycord, title) {
   
   x <- flip(img *2)
   
   par(mar = c(0, 0, 0, 0))  # Set margins to zero
-  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp =1)
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp =1, main = paste(title))
   
   rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
   points(x = cells[,xcord] / dim(x)[1], y = cells[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 0.2)
@@ -33,7 +33,7 @@ defining variable names
 ```{r}
 inputDir <- "data/1344_48h_Repeat Oct 2020"
 inputName <- "1344 40min PAA 48hrs 2"
-outputName <- "1_PAA_48_40_2"
+outputName <- "1_48_PAA_40_2"
 ```
 
 load original segmentation + image and view 
@@ -85,14 +85,14 @@ offset subtraction - cropped
 if(offsetPos == "y") {
   
   par(mfrow = c(1,2))
-  plot(imgG[948:975, 325:360]*4)
-  plot(imgR[948:975, 325:360]*4)
+  plot(imgG[619:639, 441:461]*4)
+  plot(imgR[619:639, 441:461]*4)
 
-  osR=mean(imgR[948:975, 325:360])
-  osG=mean(imgG[948:975, 325:360])
+  osR=mean(imgR[619:639, 441:461])
+  osG=mean(imgG[619:639, 441:461])
 
-  imgRo <- imgR - osR # subtracting mean intensity from full image 
-  imgGo <- imgG - osG
+  imgRo <- normalize(imgR - osR, ft=c(0,1)) # subtracting mean intensity from full image 
+  imgGo <- normalize(imgG - osG, ft=c(0,1))
 
   par(mfrow = c(2,2))
   plot(imgR)
@@ -104,8 +104,8 @@ if(offsetPos == "y") {
   
   cat("no offset possible")
   
-  imgRo <- imgR
-  imgGo <- imgG
+  imgRo <- normalize(imgR, ft=c(0,1))
+  imgGo <- normalize(imgG, ft=c(0,1))
   
 }
 ```
@@ -307,6 +307,19 @@ colnames(cellLocG) <- c("m.cx", "m.cy","redMeanInts", "redSDInts", "greenMeanInt
 cellLocFull <- rbind(cellLocR, cellLocG)
 ```
 
+exaimining first segmentation
+
+```{r}
+
+par(mfrow = c(1,1))
+
+plotontop(img, cellLocG, cellLocR, "m.cx", "m.cy", "first segmentation") # examining my segmentation 
+
+plotontop(img, OGgreen, OGred, "XM", "YM", "original segmentation") # comparing to original 
+
+```
+
+
 calculating nearest neighbour and selecting those closet together 
 
 ```{r}
@@ -348,15 +361,15 @@ cellLocFullAdj <- rbind(cellLocGadj,cellLocR)
 
 ```
 
-exaimining first segmentation
+exaimining second segmentation
 
 ```{r}
 
 par(mfrow = c(1,1))
 
-plotontop(img, cellLocGadj, cellLocR, "m.cx", "m.cy") # examining my segmentation 
+plotontop(img, cellLocGadj, cellLocR, "m.cx", "m.cy", "second segmentation") # examining my segmentation 
 
-plotontop(img, OGgreen, OGred, "XM", "YM") # comparing to original 
+plotontop(img, OGgreen, OGred, "XM", "YM", "original segmentation") # comparing to original 
 
 ```
 
@@ -364,11 +377,20 @@ setting threshold cutoff
 
 ```{r}
 
-deadSet <- which(cellLocFullAdj$redMeanInts / cellLocFullAdj$greenMeanInts > 0.9)
-liveSet <- which(cellLocFullAdj$redMeanInts / cellLocFullAdj$greenMeanInts < 0.9)
+cellLocFullAdj09 <- cellLocFullAdj
+cellLocFullAdj1 <- cellLocFullAdj
 
-cellLocFullAdj$condition[deadSet] <- "0" 
-cellLocFullAdj$condition[liveSet] <- "1" 
+deadSet09 <- which(cellLocFullAdj09$redMeanInts / cellLocFullAdj09$greenMeanInts > 0.9)
+liveSet09 <- which(cellLocFullAdj09$redMeanInts / cellLocFullAdj09$greenMeanInts < 0.9)
+
+cellLocFullAdj09$condition[deadSet09] <- "0" 
+cellLocFullAdj09$condition[liveSet09] <- "1" 
+
+deadSet1 <- which(cellLocFullAdj1$redMeanInts > cellLocFullAdj1$greenMeanInts)
+liveSet1 <- which(cellLocFullAdj1$greenMeanInts > cellLocFullAdj1$redMeanInts)
+
+cellLocFullAdj1$condition[deadSet1] <- "0" 
+cellLocFullAdj1$condition[liveSet1] <- "1" 
 
 ```
 
@@ -378,20 +400,45 @@ viewing adjusted segmentation
 
 par(mfrow = c(1,1))
 
-plotontop(img, cellLocFullAdj[cellLocFullAdj$condition == "1" ,], cellLocFullAdj[cellLocFullAdj$condition == "0" ,], "m.cx", "m.cy") # examining my segmentation 
+plotontop(img, cellLocFullAdj[cellLocFullAdj$condition == "1" ,], 
+          cellLocFullAdj[cellLocFullAdj$condition == "0" ,], "m.cx", "m.cy", "standard") # examining my segmentation 
 
-p1 <- ggplot(rbind(cellLocGadj,cellLocR), mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
+plotontop(img, cellLocFullAdj09[cellLocFullAdj09$condition == "1" ,], 
+          cellLocFullAdj09[cellLocFullAdj09$condition == "0" ,], "m.cx", "m.cy", "0.9 threshold") # examining my segmentation 
+
+plotontop(img, cellLocFullAdj1[cellLocFullAdj1$condition == "1" ,], 
+          cellLocFullAdj1[cellLocFullAdj1$condition == "0" ,], "m.cx", "m.cy", "1 threshold") # examining my segmentation 
+
+
+p1 <- ggplot(cellLocFullAdj, mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
   geom_point() +
   xlim(c(0,1)) +
-  ylim(c(0,1)) 
+  ylim(c(0,1)) +
+  ggtitle("original segmentation")
 
-p2 <- ggplot(cellLocFullAdj, mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
+p2 <- ggplot(cellLocFullAdj09, mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
   geom_point() +
   xlim(c(0,1)) +
-  ylim(c(0,1)) 
+  ylim(c(0,1)) +
+  ggtitle("0.9 threshold")
 
-grid.arrange(p1, p2, ncol = 2)
+p3 <- ggplot(cellLocFullAdj1, mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) +
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) +
+  ggtitle("1:1 threshold")
 
+grid.arrange(p1, p2, p3, ncol = 3)
+
+```
+
+### dataframe for segmentation values 
+
+```{r}
+varNames <- c("thGvalue", "thRvalue", "rRatioValue", "offsetRegion", "sumR", "sumG")
+varVal <- c(thGvalue, thRvalue, rRatioValue, offsetRegion, sum(imgRo), sum(imgGo))
+
+segVals <- data.frame(varNames = varNames, varVal = varVal)
 ```
 
 ### saving output 
@@ -399,10 +446,14 @@ grid.arrange(p1, p2, ncol = 2)
 ```{r}
 if(saveOut == "y") {
   
-  write.csv(cellLocFullAdj, paste0("results2/segmentationAdj/", outputName, ".csv"))
-
-  write.table(c(thGvalue, thRvalue, rRatioValue, offsetRegion, sum(imgRo), sum(imgGo)), 
-              paste0("results2/segmentationAdj/", outputName, "_values.txt"), sep = "\t")
+  write.csv(cellLocFullAdj, paste0("outputs/segmentation/", outputName, ".csv"))
+  write.table(segVals, paste0("outputs/segmentation/", outputName, "_values.txt"), sep = "\t")
+  
+  write.csv(cellLocFullAdj09, paste0("outputs/segmentation09/", outputName, ".csv"))
+  write.table(segVals, paste0("outputs/segmentation09/", outputName, "_values.txt"), sep = "\t")
+  
+  write.csv(cellLocFullAdj1, paste0("outputs/segmentation1/", outputName, ".csv"))
+  write.table(segVals, paste0("outputs/segmentation1/", outputName, "_values.txt"), sep = "\t")
   
 } else {
   cat("not saved")
