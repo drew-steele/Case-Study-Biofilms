@@ -23,17 +23,17 @@ plotontop <- function(img, cells, red, xcord, ycord, title) {
   plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, 1), asp =1, main = paste(title))
   
   rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
-  points(x = cells[,xcord] / dim(x)[1], y = cells[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 1)
-  points(x = red[,xcord] / dim(x)[1], y = red[,ycord] / dim(x)[1], col = "red", pch = 1, cex = 1)
+  points(x = cells[,xcord] / dim(x)[1], y = cells[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 0.4)
+  points(x = red[,xcord] / dim(x)[1], y = red[,ycord] / dim(x)[1], col = "red", pch = 1, cex = 0.4)
 }
 ```
 
 defining variable names 
 
 ```{r}
-inputDir <- "data/3750_24h_Repeat Oct 2020"
-inputName <- "3750 20min PAA 24hrs 1"
-outputName <- "1_24_H2O2_20_3"
+inputDir <- "data/1344_48h_Repeat Oct 2020"
+inputName <- "1344 20min H2O2 48hrs 3"
+outputName <- "1_48_H2O2_20_3"
 ```
 
 load original segmentation + image and view 
@@ -50,20 +50,21 @@ display(img *2, method="browser")
 defining script variables and which parts to run
 
 ```{r}
-thGvalue <- 0.025
+thGvalue <- 0.028
 thRvalue <- 0.045
-rRatioValue <- 1.4
-gblurVal <- 3
+rRatioValue <- 1.5
+gblurVal <- 1.5
 
-thGloop <- "y"
-thRloop <- "y"
+thGloop <- "n"
+thRloop <- "n"
 rRatioLoop <- "n"
 offsetPos <- "n"
-# gblurNeed <- "n"
+#redOrGreenDominant <- "r"
+
 
 saveOut <- "n"
 
-offsetRegion <- "350:370, 477:497"
+offsetRegion <- "NA"
 ```
 
 split colour channels 
@@ -87,11 +88,11 @@ offset subtraction - cropped
 if(offsetPos == "y") {
   
   par(mfrow = c(1,2))
-  plot(imgG[350:370, 477:497]*4)
-  plot(imgR[350:370, 477:497]*4)
+  plot(imgG[654:664, 319:329]*4)
+  plot(imgR[654:664, 319:329]*4)
 
-  osR=mean(imgR[350:370, 477:497])
-  osG=mean(imgG[350:370, 477:497])
+  osR=mean(imgR[654:664, 319:329])
+  osG=mean(imgG[654:664, 319:329])
 
   imgRo <- normalize(imgR - osR, ft=c(0,1)) # subtracting mean intensity from full image 
   imgGo <- normalize(imgG - osG, ft=c(0,1))
@@ -175,7 +176,7 @@ selecting best method
 ```{r}
 
 imgGth <- thresh(imgGe, w=5, h=5, offset = thGvalue)
-#plot(imgGth)
+plot(imgGth)
 
 ```
 
@@ -217,6 +218,7 @@ if(rRatioLoop == "y") {
 }
 
 imgRb <- imgRo - (imgGo / rRatioValue)
+plot(imgRb)
 
 ```
 
@@ -263,7 +265,7 @@ adaptive thresholding - selecting best method
 ```{r}
 
 imgRth <- thresh(imgRe, w=5, h=5, offset= thRvalue)
-#plot(imgRth)
+plot(imgRth)
 
 ```
 
@@ -313,11 +315,11 @@ exaimining first segmentation
 
 ```{r}
 
-par(mfrow = c(1,1))
+#par(mfrow = c(1,1))
 
-plotontop(img, cellLocG, cellLocR, "m.cx", "m.cy", "first segmentation") # examining my segmentation 
+#plotontop(img, cellLocG, cellLocR, "m.cx", "m.cy", "first segmentation") # examining my segmentation 
 
-plotontop(img, OGgreen, OGred, "XM", "YM", "original segmentation") # comparing to original 
+#plotontop(img, OGgreen, OGred, "XM", "YM", "original segmentation") # comparing to original 
 
 ```
 
@@ -369,11 +371,11 @@ exaimining second segmentation
 
 ```{r}
 
-par(mfrow = c(1,1))
+#par(mfrow = c(1,1))
 
-plotontop(img, cellLocGadj, cellLocR, "m.cx", "m.cy", "second segmentation") # examining my segmentation 
+#plotontop(img, cellLocGadj, cellLocR, "m.cx", "m.cy", "second segmentation") # examining my segmentation 
 
-plotontop(img, OGgreen, OGred, "XM", "YM", "original segmentation") # comparing to original 
+#plotontop(img, OGgreen, OGred, "XM", "YM", "original segmentation") # comparing to original 
 
 ```
 
@@ -403,6 +405,8 @@ viewing adjusted segmentation
 ```{r}
 
 par(mfrow = c(1,1))
+
+plotontop(img, OGgreen, OGred, "XM", "YM", "original segmentation") # comparing to original 
 
 plotontop(img, cellLocFullAdj[cellLocFullAdj$condition == "1" ,], 
           cellLocFullAdj[cellLocFullAdj$condition == "0" ,], "m.cx", "m.cy", "standard") # examining my segmentation 
@@ -440,7 +444,7 @@ grid.arrange(p1, p2, p3, ncol = 3)
 
 ```{r}
 varNames <- c("thGvalue", "thRvalue", "rRatioValue", "offsetRegion", "sumR", "sumG")
-varVal <- c(thGvalue, thRvalue, rRatioValue, offsetRegion, sum(imgRo), sum(imgGo))
+varVal <- c(thGvalue, thRvalue, rRatioValue, offsetRegion, sum(imgR), sum(imgG))
 
 segVals <- data.frame(varNames = varNames, varVal = varVal)
 ```
