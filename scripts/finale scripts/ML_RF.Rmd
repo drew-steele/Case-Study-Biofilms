@@ -1,0 +1,130 @@
+---
+title: "ML_RF"
+author: "Drew"
+date: "2024-03-28"
+output: html_document
+---
+
+```{r}
+
+library(randomForestSRC)
+library(caret)
+library(ROSE)
+library(imbalance)
+library(corrplot)
+library(nortest)
+library(GGally)
+
+```
+
+defining variables 
+
+```{r}
+
+dir <- "results/cellInfo/"
+datName1 <- "1_PAA_48_40_2"
+datName2 <- "1_PAA_48_40_3"
+
+```
+
+loading data 
+
+```{r}
+
+dat1 <- read.csv(paste0(dir, datName1, ".All.Inf.csv"))
+dat1$condition <- as.factor(dat1$condition)
+
+dat2 <- read.csv(paste0(dir, datName2, ".All.Inf.csv"))
+dat2$condition <- as.factor(dat2$condition)
+  
+datAll <- rbind(dat1,dat2)
+  
+str(dat1)
+str(dat2)
+str(datAll)
+
+```
+
+correlation test 
+
+```{r}
+
+corVals <- cor(datAll[,6:17])
+
+corrplot(corVals)
+
+```
+
+selecting features
+
+```{r}
+#varSelect <- c("condition", "densityVal", "liveMeanDist", "deadMeanDist", "deadNV", "liveNV", "n.tri", "dir.area")
+varSelect <- c("condition", "densityVal", "deadNV", "liveNV", "n.tri", "dir.area")
+```
+
+splitting data 
+
+```{r}
+
+index1 <- createDataPartition(dat1$condition, p = 0.7, list = FALSE) # taking 40% of data
+train1 <- dat1[index1, varSelect]
+test1 <- dat1[-index1, varSelect]
+
+index2 <- createDataPartition(dat2$condition, p = 0.7, list = FALSE) # taking 40% of data
+train2 <- dat2[index2, varSelect]
+test2 <- dat2[-index2, varSelect]
+
+indexAll <- createDataPartition(datAll$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainAll <- datAll[indexAll, varSelect]
+testAll <- datAll[-indexAll, varSelect]
+
+```
+
+creating models
+
+```{r}
+mod.1 <- imbalanced(condition ~ ., train1, importance = T)
+mod.2 <- imbalanced(condition ~ ., train2, importance = T)
+mod.All <- imbalanced(condition ~ ., trainAll, importance = T)
+```
+
+evaluating models 
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(mod.1)
+print(predict(mod.1, test1))
+print(predict(mod.1, dat2))
+plot(mod.1)
+
+
+print(mod.2)
+print(predict(mod.2, test2))
+print(predict(mod.2, dat1))
+plot(mod.2)
+
+
+print(mod.All)
+print(predict(mod.All, testAll))
+plot(mod.All)
+
+```
+
+VIMP
+
+```{r}
+
+mod.1sub <- subsample(mod.1, verbose = T)
+mod.2sub <- subsample(mod.2, verbose = T)
+mod.Allsub <- subsample(mod.All, verbose = T)
+
+
+par(mfrow = c(1,3))
+plot.subsample(mod.1sub, main = "Mod 1")
+plot.subsample(mod.2sub, main = "Mod 2")
+plot.subsample(mod.Allsub, main = "Mod All")
+
+```
+
