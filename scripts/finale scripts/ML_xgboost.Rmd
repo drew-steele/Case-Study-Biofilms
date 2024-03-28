@@ -1,0 +1,145 @@
+---
+title: "ML_xgboost"
+author: "Drew"
+date: "2024-03-28"
+output: html_document
+---
+
+```{r}
+library(xgboost)
+library(caTools)
+library(dplyr)
+library(caret)
+library(corrplot)
+library(nortest)
+```
+
+defining variables 
+
+```{r}
+
+dir <- "results/cellInfo/"
+datName1 <- "1_PAA_48_40_2"
+datName2 <- "1_PAA_48_40_3"
+
+```
+
+loading data 
+
+```{r}
+
+dat1 <- read.csv(paste0(dir, datName1, ".All.Inf.csv"))
+#dat1$condition <- as.factor(dat1$condition)
+
+dat2 <- read.csv(paste0(dir, datName2, ".All.Inf.csv"))
+#dat2$condition <- as.factor(dat2$condition)
+  
+datAll <- rbind(dat1,dat2)
+  
+str(dat1)
+str(dat2)
+str(datAll)
+
+```
+
+correlation test 
+
+```{r}
+
+corVals <- cor(datAll[,6:17])
+
+corrplot(corVals)
+
+```
+
+selecting features
+
+```{r}
+varSelect <- c("condition", "densityVal", "liveMeanDist", "deadMeanDist", "deadNV", "liveNV", "n.tri", "dir.area")
+#varSelect <- c("condition", "densityVal", "deadNV", "liveNV", "n.tri", "dir.area")
+```
+
+splitting data 
+
+```{r}
+
+index1 <- createDataPartition(dat1$condition, p = 0.7, list = FALSE) # taking 40% of data
+train1 <- dat1[index1, varSelect]
+test1 <- dat1[-index1, varSelect]
+
+index2 <- createDataPartition(dat2$condition, p = 0.7, list = FALSE) # taking 40% of data
+train2 <- dat2[index2, varSelect]
+test2 <- dat2[-index2, varSelect]
+
+indexAll <- createDataPartition(datAll$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainAll <- datAll[indexAll, varSelect]
+testAll <- datAll[-indexAll, varSelect]
+
+```
+
+creating model - easy mode 
+
+```{r}
+
+mod.1 <- xgboost(data = as.matrix(train1[,-1]), label = train1$condition, 
+                 max.depth = 6, eta = 1, nthread = 2, nrounds = 15, objective = "binary:logistic", verbose = 2,
+                 scale_pos_weight = sum(train1$condition == 0) / sum(train1$condition == 1))
+
+```
+
+evaluating modle 
+
+```{r}
+
+pred.1 <- predict(mod.1, as.matrix(test1[,-1]))
+pred.1 <-  as.numeric(pred.1 > 0.5)
+confusionMatrix(factor(pred.1),factor(test1$condition), mode = "everything")
+
+pred.1d2 <- predict(mod.1, as.matrix(train2[,-1]))
+pred.1d2 <-  as.numeric(pred.1d2 > 0.5)
+confusionMatrix(factor(pred.1d2),factor(train2$condition), mode = "everything")
+
+```
+
+feature importance 
+
+```{r}
+imp.1 <- xgb.importance(feature_names = colnames(train2[,-1]), model = mod.1)
+head(imp.1)
+xgb.plot.importance(importance_matrix = imp.1)
+```
+
+
+
+creating model - hard mode 
+
+```{r}
+
+trainX <- xgb.DMatrix(data = as.matrix(train1[,-1]), label = train1[,1])
+testX <- xgb.DMatrix(data = as.matrix(test1[,-1]), label = test1[,1])
+
+param <- list(objective = "binary:logistic",
+              scale_pos_weight = sum(train1$condition == 0) / sum(train1$condition == 1),
+              eta = 0.1,
+              max_depth = 6,
+              nthread = 16)
+
+mod.1 <- xgb.train(
+  params = param,
+  data = trainX,
+  nrounds = 129,
+  verbose = 2)
+
+xgb_model
+
+pred.1 <- predict(mod.1, as.matrix(test1[,-1]))
+pred.1 <-  as.numeric(pred.1 > 0.5)
+confusionMatrix(factor(pred.1),factor(test1$condition), mode = "everything")
+
+pred.1d2 <- predict(mod.1, as.matrix(train2[,-1]))
+pred.1d2 <-  as.numeric(pred.1d2 > 0.5)
+confusionMatrix(factor(pred.1d2),factor(train2$condition), mode = "everything")
+
+```
+
+
