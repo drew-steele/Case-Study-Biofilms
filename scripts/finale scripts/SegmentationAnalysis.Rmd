@@ -1,0 +1,56 @@
+---
+title: "SegmentationAnalysis"
+author: "Drew"
+date: "2024-03-29"
+output: html_document
+---
+
+defining varibles 
+
+```{r}
+dir <- "results_good/segmentation"
+files <- list.files(path = dir, pattern = ".txt", full.names = TRUE)
+```
+
+reading in data 
+
+```{r}
+data_list <- list()
+
+for (i in files) {
+  title <- strsplit(basename(i), "\\.")[[1]][1]
+  x <- t(read.delim(i)) 
+  y <- as.numeric(x[2, c(5:8,11:12)]) 
+  data_list[[title]] <- y 
+}
+```
+
+data manipulation 
+
+```{r}
+dat <- t(as.data.frame(data_list))
+dat <- as.data.frame(dat)
+
+colnames(dat) <- c("sumR", "sumG", "meanG", "meanR", "dead", "live")
+
+dat$ldRatio <- log(dat$dead / dat$live)
+dat$grRatio <- log(dat$meanR / dat$meanG)
+dat$grSumRatio <- log(dat$sumR / dat$sumG)
+```
+
+plotting and regression
+
+```{r}
+plot(dat$ldRatio~dat$grRatio)
+abline(lm(dat$ldRatio~dat$grRatio), col = "red")
+
+grReg <- lm(dat$ldRatio~dat$grRatio)
+summary(grReg)
+
+plot(dat$ldRatio~dat$grSumRatio)
+abline(lm(dat$ldRatio~dat$grSumRatio), col = "red")
+
+grSum <- lm(dat$ldRatio~dat$grSumRatio)
+summary(grSum)
+```
+
