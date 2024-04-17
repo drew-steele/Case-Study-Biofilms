@@ -1,0 +1,112 @@
+---
+title: "VIMPplot"
+author: "Drew Steele"
+date: "2024-04-08"
+output: html_document
+---
+
+### script to plot random forest VIMP importance 
+creating group box and whiskers plots from sub sampled VIMP data 
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+```
+
+### defining variables - new segmentation data 
+
+```{r}
+dir <- "results_good/ML"
+
+files <- list.files(path = dir, pattern = "formatted.txt", full.names = TRUE)
+
+data_list <- list()
+```
+
+### reading in files - new segmentation data 
+
+```{r}
+for (i in files) {
+  title <- strsplit(basename(i), "\\.")[[1]][1]
+  x <- read.table(i)
+  data_list[[title]] <- x 
+}
+
+data_long <- rbind(
+  mutate(data_list[[1]], condition = "H2O2 40"),
+  mutate(data_list[[2]], condition = "NaCLO 20"),
+  mutate(data_list[[3]], condition = "NaCLO 40"),
+  mutate(data_list[[4]], condition = "PAA 20"),
+  mutate(data_list[[5]], condition = "PAA 40"),
+  mutate(data_list[[6]], condition = "PAA 60")
+)
+
+data_long <- gather(data_long, key = "variable", value = "value", -condition)
+```
+
+### defining variables - original segmentation data 
+
+```{r}
+dir.og <- "results_good/ML"
+
+files_OG <- list.files(path = dir.og, pattern = "formatted_OG.txt", full.names = TRUE)
+
+data_list_OG <- list()
+```
+
+### reading in files - original segmentation data 
+
+```{r}
+for (i in files_OG) {
+  title <- strsplit(basename(i), "\\.")[[1]][1]
+  x <- read.table(i)
+  data_list_OG[[title]] <- x 
+}
+
+data_long_OG <- rbind(
+  mutate(data_list_OG[[1]], condition = "H2O2 40"),
+  mutate(data_list_OG[[2]], condition = "NaCLO 20"),
+  mutate(data_list_OG[[3]], condition = "NaCLO 40"),
+  mutate(data_list_OG[[4]], condition = "PAA 20"),
+  mutate(data_list_OG[[5]], condition = "PAA 40"),
+  mutate(data_list_OG[[6]], condition = "PAA 60")
+)
+
+data_long_OG <- gather(data_long_OG, key = "variable", value = "value", -condition)
+```
+
+### plotting
+
+```{r}
+
+new_labels <- c("Dead Mean Dist", "Dead Nbrs", "Density", "Voronoi Area", "Live Mean Dist", "Live Nbrs", "Total Nbrs")
+
+p1 <- ggplot(data_long, aes(x = variable, y = value, fill = condition)) +
+  geom_boxplot() +
+  labs(x = NULL, y = "VIMP") +
+  ggtitle("B)") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  theme(axis.title.y = element_text(size = 16)) +
+  theme(aspect.ratio=1) +
+  theme(axis.text.x = element_text(size = 12, angle = 70, hjust = 1)) +
+  theme(axis.text.y = element_text(size = 12)) +
+  scale_x_discrete(labels = new_labels)
+
+p2 <- ggplot(data_long_OG, aes(x = variable, y = value, fill = condition)) +
+  geom_boxplot() +
+  ggtitle("A)") +
+  labs( x = NULL,y = "VIMP") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  theme(aspect.ratio=1) +
+  theme(axis.title.y = element_text(size = 16)) +
+  theme(axis.text.x = element_text(size = 12, angle = 70, hjust = 1)) +
+  theme(axis.text.y = element_text(size = 12)) +
+  scale_x_discrete(labels = new_labels)
+
+grid.arrange(p2, p1, ncol =2)
+```
+
+

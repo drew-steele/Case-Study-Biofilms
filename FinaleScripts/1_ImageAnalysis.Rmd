@@ -1,0 +1,269 @@
+---
+title: "ImageAnalysis"
+author: "Drew Steele"
+date: "2024-03-28"
+output: html_document
+---
+
+```{r}
+library(spatstat)
+library(ggplot2)
+library(gridExtra)
+library(EBImage)
+```
+
+### defining variable names 
+
+```{r}
+inputDir <- "data/1344_48h_Repeat Oct 2020"
+inputName <- "1344 60min PAA 48hrs 2"
+outputName <- "null"
+```
+
+### setting segmentation variables 
+
+```{r}
+saveOut <- "n"
+
+threshVal <- 0.02
+gblurVal <- 1.5 
+#cropRegion <- list(r = 1:689, c = 1:512)
+cropRegion <- "NA"
+#offsetRegion <- list(r = 940:950, c = 478:488)
+offsetRegion <- "NA"
+redAdj <- 1
+greenAdj <- 1
+waterVal <- 1
+comments <- "add comment here which will be saved with other segmentation values"
+keep <- "y"
+
+threshLoop <- "n"
+offsetPos <- "n"
+cropReq <- "n"
+
+aspec <- 0.5  # changes aspec ration for plotontop function
+conVal <- 1.5 # changes contrast setting for work flow
+```
+
+### defining functions 
+
+plots segmentation coordinates on top of original image 
+
+```{r}
+plotontop <- function(img, live, dead, xcord, ycord, title) {
+  
+  x <- flip(img * conVal)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, aspec), asp =1, main = paste(title))
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = live[,xcord] / dim(x)[1], y = live[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 1)
+  points(x = dead[,xcord] / dim(x)[1], y = dead[,ycord] / dim(x)[1], col = "red", pch = 1, cex = 1)
+}
+```
+
+
+### load original segmentation + image and view 
+
+```{r}
+OGgreen <- read.csv(paste0(inputDir, "/", inputName, ".green.csv"))
+OGred <- read.csv(paste0(inputDir, "/", inputName, ".red.csv"))
+
+imgRaw <- readImage(paste0(inputDir, "/", inputName, ".tif"))
+display(flip(imgRaw), method="browser")
+display(flip(imgRaw * conVal), method="browser")
+#display(imgRaw *2, method="browser")
+```
+
+### cropping image 
+
+```{r}
+if(cropReq == "y") {
+  
+  img <- imgRaw[cropRegion$r, cropRegion$c, 1:3]
+  
+  par(mfrow = c(1,1))
+  plot(img)
+
+
+} else {
+  
+  cat("no cropping required")
+  
+  img <- imgRaw
+  
+}
+```
+
+
+### splitting and combining colour channels 
+
+```{r}
+imgR <- getFrame(img, 1) # splitting colour channels
+imgG <- getFrame(img, 2)
+
+imgC <- normalize((imgR * redAdj) + (imgG * greenAdj), ft=c(0,1)) # creating flatted image
+
+par(mfrow=c(3,1))
+plot(imgR)
+plot(imgC)
+plot(imgG)
+
+par(mar = c(6,6,6,6))  # histograms of colour intensities
+par(mfrow = c(2,2))
+hist(imgR, main = "red")
+hist(imgG,main = "green")
+hist(img,main = "OG")
+hist(imgC,main = "combo")
+
+display(imgC * conVal)
+```
+
+### offset subtraction 
+
+```{r}
+if(offsetPos == "y") {
+  
+  par(mfrow = c(1,2))
+  plot(imgC[offsetRegion$r, offsetRegion$c]*4)
+
+  os=mean(imgC[offsetRegion$r, offsetRegion$c])
+
+  imgCo <- normalize(imgC - os, ft=c(0,1)) # subtracting mean intensity from full image 
+
+  par(mfrow = c(1,2))
+  plot(imgC)
+  plot(imgCo)
+
+
+} else {
+  
+  cat("no offset possible")
+  
+  imgCo <- normalize(imgC, ft=c(0,1))
+  
+}
+```
+
+### edge detection
+
+```{r}
+k = matrix(-1, nrow = 3, ncol = 3) # defining convolution kernel 
+k[2, 2] = 8
+k
+
+imgE <- EBImage::filter2(gblur(imgCo,sigma=gblurVal),k) # applying edge detection and Gaussian blur 
+
+par(mfrow = c(2,1))
+plot(img * conVal)
+plot(normalize(imgE))
+```
+
+### thresholding
+
+```{r}
+if(threshLoop == "y") { # running loop to find best threshold value 
+  
+  for (i in seq(from = 0.005, to = 0.05, by = 0.005)) {
+  
+    x <- thresh(imgE, w=5, h=5, offset= i)
+  
+    par(mfrow = c(2,1))
+    display(x, method="raster")
+    text(x = 20, y = 20, label = paste("offset = ", i), adj = c(0,1), col = "green", cex = 1.5)
+    display(img * conVal, method="raster")
+    text(x = 20, y = 20, label = "Original image", adj = c(0,1), col = "green", cex = 1.5)
+  
+  }
+} else {
+  cat("green threshold loop not run")
+}
+
+imgTh <- thresh(imgE, w=5, h=5, offset = threshVal) # applying threshold, w and h = kernel size for adaptive thresh
+plot(img)
+plot(imgTh)
+```
+
+### eroding + dilation remove single pixels 
+
+```{r}
+#kern <- makeBrush(3, shape = "box")
+#logo_erode= erode(imgTh, kern)
+#logo_dilate = dilate(logo_erode, kern)
+
+#plot(logo_dilate)
+#plot(imgTh)
+```
+
+watershed algorithm 
+
+```{r}
+nmask <- watershed(EBImage::distmap(imgTh), tolerance = waterVal, ext = 1)
+
+par(mfrow = c(2,1))
+plot(colorLabels(nmask), all = T)
+plot(img * conVal)
+```
+
+extracting intensity vals and cell coordinates - assigning live dead status 
+
+```{r}
+IntValR <- as.data.frame(computeFeatures.basic(nmask, imgR)[,1:2]) # extractign intensity info for each cell - using red image as ref
+IntValG <- as.data.frame(computeFeatures.basic(nmask, imgG)[,1:2]) # using green image as ref
+
+cellLoc <- as.data.frame(cbind(computeFeatures.moment(nmask)[,1:2], IntValR, IntValG)) # extracting cell coordinates
+colnames(cellLoc) <- c("m.cx", "m.cy","redMeanInts", "redSDInts", "greenMeanInts", "greenSDInts")
+cellLoc$condition <- "null"
+
+deadSet <- which(cellLoc$redMeanInts > cellLoc$greenMeanInts) # assigning dead set 
+liveSet <- which(cellLoc$greenMeanInts > cellLoc$redMeanInts) # assigning live set 
+
+cellLoc$condition[deadSet] <- "0" 
+cellLoc$condition[liveSet] <- "1" 
+```
+
+### plotting original and new segmentation 
+
+```{r}
+par(mfrow = c(1,1))
+
+ggplot(cellLoc, mapping = aes(x = redMeanInts, y = greenMeanInts, colour = condition)) + # plotting red and green intensity for each cell 
+  geom_point() +
+  xlim(c(0,1)) +
+  ylim(c(0,1)) +
+  ggtitle("live dead distribution") + 
+  theme(aspect.ratio=1)
+
+plotontop(imgRaw, OGgreen, OGred, "XM", "YM", "original segmentation") # comparing to original 
+
+plotontop(img, cellLoc[cellLoc$condition == "1" ,], 
+          cellLoc[cellLoc$condition == "0" ,], "m.cx", "m.cy", "new segmentation") # examining new segmentation 
+```
+
+### creating data frame for segmentation values 
+
+```{r}
+varNames <- c("threshVal", "gblurVal", "offsetRegion", "cropRegion", "sumR", "sumG", 
+            "meanG", "meanR", "redAdj", "greenAdj", "deadCount", "liveCount", "comments", "keep")
+
+varVal <- c(threshVal, gblurVal, paste(offsetRegion, collapse = " "), 
+            paste(cropRegion, collapse = " "), sum(imgR), sum(imgG), 
+            mean(cellLoc$greenMeanInts), mean(cellLoc$redMeanInts), redAdj, greenAdj, 
+            sum(cellLoc$condition == "0"), sum(cellLoc$condition == "1"), comments, keep)
+
+segVals <- data.frame(varNames = varNames, varVal = varVal)
+```
+
+### saving output 
+
+```{r}
+if(saveOut == "y") {
+  
+  write.csv(cellLoc, paste0("results_good/segmentation2/", outputName, ".csv"))
+  write.table(segVals, paste0("results_good/segmentation2/", outputName, "_values.txt"), sep = "\t")
+  
+} else {
+  cat("not saved")
+}
+```

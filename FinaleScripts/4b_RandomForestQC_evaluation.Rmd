@@ -1,0 +1,243 @@
+---
+title: "RandomForestQC_evaluation"
+author: "Drew Steele"
+date: "2024-04-06"
+output: html_document
+---
+
+### evalauation of random forrest quantile classifer and data imbalance techniques 
+
+```{r}
+
+library(randomForestSRC)
+library(caret)
+library(ROSE)
+library(imbalance)
+library(corrplot)
+library(nortest)
+library(GGally)
+
+```
+
+### defining variables 
+
+```{r}
+dir1 <- "results_good/CellInfo/"
+
+datName1 <- "1_48_PAA_40_2"
+datName2 <- "1_48_PAA_40_3"
+```
+
+### loading data 
+
+```{r}
+dat1 <- read.csv(paste0(dir1, datName1, ".All.Inf.csv"))
+dat1$condition <- as.factor(dat1$condition)
+
+dat2 <- read.csv(paste0(dir1, datName2, ".All.Inf.csv"))
+dat2$condition <- as.factor(dat2$condition)
+  
+datAll <- rbind(dat1,dat2)
+  
+str(dat1)
+str(dat2)
+str(datAll)
+```
+
+### correlation test 
+
+```{r}
+par(mfrow = c(1,1))
+
+corVals <- cor(datAll[,6:17])
+
+corrplot(corVals)
+```
+
+### selecting features
+
+```{r}
+varSelect <- c("condition", "densityVal", "liveMeanDist", "deadMeanDist", "deadNV", "liveNV", "n.tri", "dir.area")
+#varSelect <- c("condition", "densityVal", "deadNV", "liveNV", "n.tri", "dir.area")
+#varSelect <- c("condition", "deadNV", "liveNV", "n.tri")
+#varSelect <- c("condition", "densityVal", "n.tri", "dir.area")
+```
+
+### splitting data 
+
+```{r}
+set.seed(101)
+
+
+train1 <- dat1[, varSelect]
+train2 <- dat2[, varSelect]
+
+indexAll <- createDataPartition(datAll$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainAll <- datAll[indexAll, varSelect]
+testAll <- datAll[-indexAll, varSelect]
+
+summary(train1)
+summary(train2)
+summary(trainAll)
+summary(testAll)
+```
+
+### creating synthetic data with SMOTE 
+
+```{r}
+set.seed(101)
+
+newDat1 <- mwmote(train1, numInstances = 200, classAttr = "condition")
+newDat2 <- mwmote(train2, numInstances = 200, classAttr = "condition")
+newDatAll <- mwmote(trainAll, numInstances = 200, classAttr = "condition")
+
+SMOTEdat1 <- rbind(newDat1, train1)
+SMOTEdat2 <- rbind(newDat2, train2)
+SMOTEdatAll <- rbind(newDatAll, trainAll)
+```
+
+### splitting data - over + under sampling 
+
+```{r}
+set.seed(101)
+
+dataBalance1 <- ovun.sample(condition~., data=train1, p=0.4,
+                        seed=1, method="both")$data
+
+dataBalance2 <- ovun.sample(condition~., data=train2, p=0.4,
+                        seed=1, method="both")$data
+
+dataBalanceAll <- ovun.sample(condition~., data=trainAll, p=0.4,
+                        seed=1, method="both")$data
+
+sum(dataBalance1$condition == "0")
+sum(dataBalance1$condition == "1")
+```
+
+### creating models
+
+```{r}
+set.seed(101)
+
+mod.1.RFQ <- imbalanced(condition ~ ., train1, importance = T)
+mod.2.RFQ <- imbalanced(condition ~ ., train2, importance = T)
+mod.All.RFQ <- imbalanced(condition ~ ., trainAll, importance = T)
+
+mod.1.RFQ.ovun <- imbalanced(condition ~ ., dataBalance1, importance = T)
+mod.2.RFQ.ovun <- imbalanced(condition ~ ., dataBalance2, importance = T)
+mod.All.RFQ.ovun <- imbalanced(condition ~ ., dataBalanceAll, importance = T)
+
+mod.1.RFQ.SMOTE <- imbalanced(condition ~ ., SMOTEdat1, importance = T)
+mod.2.RFQ.SMOTE <- imbalanced(condition ~ ., SMOTEdat2, importance = T)
+mod.All.RFQ.SMOTE <- imbalanced(condition ~ ., SMOTEdatAll, importance = T)
+```
+
+### evaluating models - RFQ
+
+```{r}
+par(mar = c(3,3,3,3))
+
+print(mod.1.RFQ)
+print(predict(mod.1.RFQ, train2))
+plot(mod.1.RFQ)
+
+
+print(mod.2.RFQ)
+print(predict(mod.2.RFQ, train1))
+plot(mod.2.RFQ)
+
+
+print(mod.All.RFQ)
+print(predict(mod.All.RFQ, testAll))
+plot(mod.All.RFQ)
+```
+
+### evaluating models - RFQ ovun smapling
+
+```{r}
+par(mar = c(3,3,3,3))
+
+print(mod.1.RFQ.ovun)
+print(predict(mod.1.RFQ.ovun, train2))
+plot(mod.1.RFQ.ovun)
+
+
+print(mod.2.RFQ.ovun)
+print(predict(mod.2.RFQ.ovun, train1))
+plot(mod.2.RFQ.ovun)
+
+
+print(mod.All.RFQ.ovun)
+print(predict(mod.All.RFQ.ovun, testAll))
+plot(mod.All.RFQ.ovun)
+```
+
+### evaluating models - RFQ SMOTE
+
+```{r}
+par(mar = c(3,3,3,3))
+
+print(mod.1.RFQ.SMOTE)
+print(predict(mod.1.RFQ.SMOTE, train2))
+plot(mod.1.RFQ.SMOTE)
+
+
+print(mod.2.RFQ.SMOTE)
+print(predict(mod.2.RFQ.SMOTE, train1))
+plot(mod.2.RFQ.SMOTE)
+
+
+print(mod.All.RFQ.SMOTE)
+print(predict(mod.All.RFQ.SMOTE, testAll))
+plot(mod.All.RFQ.SMOTE)
+```
+
+### calculating variable importance using subsampliong for confidence intervals - RFQ
+
+```{r}
+set.seed(101)
+
+mod.1sub.RFQ <- subsample(mod.1.RFQ, verbose = T)
+mod.2sub.RFQ <- subsample(mod.2.RFQ, verbose = T)
+mod.Allsub.RFQ <- subsample(mod.All.RFQ, verbose = T)
+
+
+par(mfrow = c(1,3))
+plot.subsample(mod.1sub.RFQ, main = "Mod 1")
+plot.subsample(mod.2sub.RFQ, main = "Mod 2")
+plot.subsample(mod.Allsub.RFQ, main = "Mod All")
+```
+
+### calculating variable importance using subsampliong for confidence intervals - ovun under/overs sampling
+
+```{r}
+set.seed(101)
+
+mod.1sub.RFQ.ovun <- subsample(mod.1.RFQ.ovun, verbose = T)
+mod.2sub.RFQ.ovun <- subsample(mod.2.RFQ.ovun, verbose = T)
+mod.Allsub..RFQ.ovun <- subsample(mod.All.RFQ.ovun, verbose = T)
+
+
+par(mfrow = c(1,3))
+plot.subsample(mod.1sub.RFQ.ovun, main = "Mod 1")
+plot.subsample(mod.2sub.RFQ.ovun, main = "Mod 2")
+plot.subsample(mod.Allsub..RFQ.ovun, main = "Mod All")
+```
+
+
+### calculating variable importance using subsampliong for confidence intervals - SMOTE
+
+```{r}
+set.seed(101)
+
+mod.1sub.RFQ.SMOTE <- subsample(mod.1.RFQ.SMOTE, verbose = T)
+mod.2sub.RFQ.SMOTE <- subsample(mod.2.RFQ.SMOTE, verbose = T)
+mod.Allsub..RFQ.SMOTE <- subsample(mod.All.RFQ.SMOTE, verbose = T)
+
+
+par(mfrow = c(1,3))
+plot.subsample(mod.1sub.RFQ.SMOTE, main = "Mod 1")
+plot.subsample(mod.2sub.RFQ.SMOTE, main = "Mod 2")
+plot.subsample(mod.Allsub..RFQ.SMOTE, main = "Mod All")
+```
+

@@ -1,0 +1,278 @@
+---
+title: "SpatialAnalysis"
+author: "Drew Steele"
+date: "2024-03-09"
+output: html_document
+---
+
+### script for feature extraction and spatial analysis
+
+```{r}
+aspec <- 0.7
+
+plotontop <- function(img, cells, red, xcord, ycord, title) {
+  
+  x <- flip(img * 2)
+  
+  par(mar = c(0, 0, 0, 0))  # Set margins to zero
+  plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 1), ylim = c(0, aspec), asp =1, main = paste(title))
+  
+  rasterImage(x, 0, 0, 1, dim(x)[2]/dim(x)[1])
+  points(x = cells[,xcord] / dim(x)[1], y = cells[,ycord]/ dim(x)[1], col = "blue", pch = 1, cex = 1)
+  points(x = red[,xcord] / dim(x)[1], y = red[,ycord] / dim(x)[1], col = "red", pch = 1, cex = 1)
+}
+```
+
+```{r}
+library(spatstat)
+library(deldir)
+```
+
+### defining variables 
+
+```{r}
+imgDir <- "data/1344_48h_Repeat Oct 2020"
+imgName <- "1344 40min PAA 48hrs 3"
+
+inputName <- "1_48_PAA_60_2"
+
+len <- 1024 # setting image size for cropped images 
+hei <- 512
+```
+
+### loading data and manipulating 
+
+```{r}
+
+dat <- read.csv(paste0("results_good/segmentation/", inputName, ".csv"))
+fullcells <- dat[,c("m.cx", "m.cy", "condition")]
+fullcells$condition[fullcells$condition == "null"] <- "0"
+fullcells$condition <- as.factor(fullcells$condition)
+fullcells$id <- rownames(fullcells)
+str(fullcells)
+
+living <- fullcells[fullcells$condition == "1" ,]
+dead <- fullcells[fullcells$condition == "0" ,]
+
+summary(fullcells)
+
+```
+
+### viewing segmentation output 
+
+```{r}
+img <- readImage(paste0(imgDir, "/", imgName, ".tif"))
+
+plotontop(img, fullcells[fullcells$condition == "1" ,], 
+          fullcells[fullcells$condition == "0" ,], "m.cx", "m.cy", "new segmentation") # examining segmentation 
+```
+
+###  creating point pattern object 
+
+```{r}
+
+pat <- ppp(fullcells[,1], fullcells[,2], c(0,len), c(0,hei)) # creating point pattern object 
+marks(pat) <- fullcells[,3] # adding info on live dead - any extra info refereed to as mark in spatstat
+
+patDead <- ppp(dead[,1], dead[,2], c(0,len), c(0,hei)) # creating point pattern object 
+
+patLive <- ppp(living[,1], living[,2], c(0,len), c(0,hei)) # creating point pattern object 
+
+```
+
+### exploring point pattern objects
+
+```{r}
+
+plot(pat)
+anyDuplicated(pat) # checking for duplicated points 
+summary(pat)
+
+plot(patDead)
+anyDuplicated(patDead) 
+summary(patDead)
+
+plot(patLive)
+anyDuplicated(patLive)
+summary(patLive)
+
+```
+
+### Spatial randomness test 
+
+```{r}
+QAll <- quadratcount(pat, nx = 20, ny = 10)
+plot(pat)
+plot(QAll, add = TRUE, cex = 1)
+
+quadrat.test(QAll, alternative="two.sided")
+quadrat.test(QAll, alternative="regular")
+quadrat.test(QAll, alternative="clustered")
+
+QDead <- quadratcount(patDead, nx = 20, ny = 10)
+plot(patDead)
+plot(QDead, add = TRUE, cex = 1)
+
+quadrat.test(QDead, alternative="two.sided")
+quadrat.test(QDead, alternative="regular")
+quadrat.test(QDead, alternative="clustered")
+
+QLive <- quadratcount(patLive, nx = 20, ny = 10)
+plot(patLive)
+plot(QLive, add = TRUE, cex = 1)
+
+quadrat.test(QLive, alternative="two.sided")
+quadrat.test(QLive, alternative="regular")
+quadrat.test(QLive, alternative="clustered")
+```
+
+### density tests 
+
+```{r}
+denAll <- density(pat) # using default bandwidth 
+attr(denAll, "sigma") # shows what bandwidth defaulted to 
+plot(denAll, main = "All") #plotting intensities 
+
+denDead <- density(patDead)
+attr(denDead, "sigma")
+plot(denDead, main = "Dead")
+
+denLive <- density(patLive)
+attr(denLive, "sigma")
+plot(denLive, main = "Live")
+
+densityVal <- denAll[pat] # extracting intensity values for each point 
+```
+
+### extracting distance data - to any cell 
+
+```{r}
+
+NNdist <- as.data.frame(nndist(pat, k = 1:6))
+NNdist[,"meanDist"] <- rowMeans(NNdist[, 1:6], na.rm = TRUE)
+NNdist[,"sumDist"] <- rowSums(NNdist[, 1:6], na.rm = TRUE)
+
+```
+
+### extracting distance data - to live / dead cell 
+
+```{r}
+
+NNdeadLive <- nncross(patDead, patLive, what = "dist", k = 1:6)
+NNliveDead <- nncross(patLive, patDead, what = "dist", k = 1:6)
+NNdeadDead <- nndist(patDead, k = 1:6)
+NNliveLive <- nndist(patLive, k = 1:6)
+
+```
+
+### extracting how many living and how many dead neighbours in certain radius
+
+```{r}
+
+# defining function to use in the marksat function 
+NEcounts <- function(x) {
+  alive_count <- sum(x == 1)
+  dead_count <- sum(x == 0)
+  
+  return(c(aliveN = alive_count, deadN = dead_count))
+}
+
+neighbourInf <- t(markstat(pat, NEcounts, R = 15))
+
+```
+
+### Voronoi tesselation transformation
+
+```{r}
+
+voronoi <- deldir(fullcells[,1:2], z = fullcells[,3], rw=c(0, len, 0, hei), eps=1e-09, sort=TRUE, plot=T,
+                  round=TRUE,digits=6, id=fullcells[,4])
+
+print(voronoi)
+
+vorInf <- voronoi$summary
+nbrs <- getNbrs(voronoi) # extracting neighbour information 
+
+```
+
+### extraactign live dead information for each cells neigbhours
+
+```{r}
+
+dead.live <- matrix(nrow = length(nbrs), ncol = 2)
+colnames(dead.live) <- c("deadNV", "liveNV")
+
+
+for (i in seq_along(nbrs)) {
+  x <- as.character(nbrs[[i]])
+  Ninf <- as.character(vorInf[x, "z"])
+  dead <- as.numeric(sum(Ninf == "0"))
+  live <- as.numeric(sum(Ninf == "1"))
+  dead.live[i, "deadNV"] <- dead
+  dead.live[i, "liveNV"] <- live
+}
+
+```
+
+### creating data frame of output 
+
+```{r}
+deadDLdist <- as.data.frame(cbind(NNdeadLive, NNdeadDead))
+  #colnames(deadDLdist) <- c("distLive.1", "distLive.2", "distLive.3", "distDead.1", "distDead.2", "distDead.3")
+liveDLdist <- as.data.frame(cbind(NNliveLive, NNliveDead))
+  #colnames(liveDLdist) <- c("distLive.1", "distLive.2", "distLive.3", "distDead.1", "distDead.2", "distDead.3")
+  
+DLdist <- rbind(liveDLdist, deadDLdist)
+DLdist$liveMeanDist <- rowMeans(DLdist[, 1:6], na.rm = TRUE)
+DLdist$deadMeanDist <- rowMeans(DLdist[, 7:12], na.rm = TRUE)
+
+cellInf <- cbind(fullcells, densityVal, NNdist[, c("dist.1", "dist.2", "dist.3", "meanDist")], neighbourInf, 
+                 DLdist[, c("liveMeanDist", "deadMeanDist")], dead.live, 
+                 vorInf[, c("n.tri", "n.tside", "nbpt", "dir.area")])
+
+cellInf <- cellInf[cellInf$nbpt == 0 ,]
+
+
+deadInf <- cellInf[cellInf$condition == 0 ,]
+liveInf <- cellInf[cellInf$condition == 1 ,]
+
+```
+
+### exploring outputs 
+
+```{r}
+#par(mfrow = c(1,2))
+
+#for (i in c("densityVal", "dist.1", "dist.2", "dist.3", "meanDist", "sumDist", "aliveN", "deadN",
+#            "distLive.1", "distLive.2", "distDead.1", "distDead.2")) {
+  
+#  cat("Variable:", i, "\n")
+  
+#  cat("Mean (Dead):", mean(deadInf[[i]]), "\n")
+#  cat("Median (Dead):", median(deadInf[[i]]), "\n")
+
+#  cat("Mean (Live):", mean(liveInf[[i]]), "\n")
+#  cat("Median (Live):", median(liveInf[[i]]), "\n")
+
+  # Plot histograms
+#  hist(deadInf[[i]], main = paste("Histogram (Dead) -", i), xlab = i, col = "lightblue", border = "black")
+#  hist(liveInf[[i]], main = paste("Histogram (Live) -", i), xlab = i, col = "lightgreen", border = "black")
+
+  # Pause for user input (press Enter to continue)
+#  cat("Press Enter to continue...")
+#  invisible(readLines(n = 1))
+#}
+
+
+```
+
+### saving output 
+
+```{r}
+
+#write.csv(deadInf, paste0("results_good/CellInfo/", inputName, ".Dead.Inf.csv"))
+#write.csv(liveInf, paste0("results_good/CellInfo/", inputName, ".Live.Inf.csv"))
+write.csv(cellInf, paste0("results_good/CellInfo/", inputName, ".All.Inf.csv"))
+
+```
+

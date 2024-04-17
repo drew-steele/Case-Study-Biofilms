@@ -1,0 +1,220 @@
+---
+title: "SegmentationInspection"
+author: "Drew Steele"
+date: "2024-03-29"
+output: html_document
+---
+
+### analysing outputs of image analysis 
+  
+```{r}
+library(EBImage)
+library(ggplot2)
+library(gridExtra)
+```
+
+
+### defining varibles
+
+```{r}
+dir <- "results_good/segmentation"
+dir2 <- "results_good/segmentation2"
+
+files1 <- list.files(path = dir, pattern = ".txt", full.names = TRUE)
+files2 <- list.files(path = dir2, pattern = ".txt", full.names = TRUE)
+
+files <- c(files1, files2)
+```
+
+### reading in data 
+
+```{r}
+data_list <- list()
+
+for (i in files) {
+  title <- strsplit(basename(i), "\\.")[[1]][1]
+  x <- t(read.delim(i)) 
+  y <- as.numeric(x[2, c(5:8,11:12)]) 
+  data_list[[title]] <- y 
+}
+```
+
+### data manipulation 
+
+```{r}
+dat <- t(as.data.frame(data_list))
+dat <- as.data.frame(dat)
+
+colnames(dat) <- c("sumR", "sumG", "meanG", "meanR", "dead", "live")
+
+dat$ldRatio <- log(dat$dead +1/ dat$live +1)
+dat$grRatio <- log(dat$meanR +1/ dat$meanG +1)
+dat$grSumRatio <- log(dat$sumR +1/ dat$sumG +1)
+```
+
+### definign variables - original segmenation
+
+```{r}
+dir.og <- "data/1344_48h_Repeat Oct 2020/"
+dir2.og <- "data/3750_48h_Repeat Oct 2020/"
+
+g1.og <- list.files(path = dir.og, pattern = "green.csv", full.names = TRUE)
+r1.og <- list.files(path = dir.og, pattern = "red.csv", full.names = TRUE)
+img1.og <- list.files(path = dir.og, pattern = ".tif", full.names = TRUE)
+
+g2.og <- list.files(path = dir2.og, pattern = "green.csv", full.names = TRUE)
+r2.og <- list.files(path = dir2.og, pattern = "red.csv", full.names = TRUE)
+img2.og <- list.files(path = dir2.og, pattern = ".tif", full.names = TRUE)
+
+g.og <- c(g1.og, g2.og)
+r.og <- c(r1.og, r2.og)
+img.og <- c(img1.og, img2.og)
+```
+
+### loading in data - original segmentation
+
+```{r}
+r.list <- list()
+
+for (i in r.og) {
+  title <- strsplit(basename(i), "\\.")[[1]][1]
+  x <- read.csv(i)
+  y <- nrow(x)
+  r.list[[title]] <- y
+}
+
+g.list <- list()
+
+for (i in g.og) {
+  title <- strsplit(basename(i), "\\.")[[1]][1]
+  x <- read.csv(i)
+  y <- nrow(x)
+  g.list[[title]] <- y
+}
+
+img.list <- list()
+
+for (i in img.og) {
+  title <- strsplit(basename(i), "\\.")[[1]][1]
+  img <- readImage(i)
+  #imgR <- getFrame(img, 1)
+  #imgG <- getFrame(img, 2)
+  y <- c(sum(getFrame(img,1)), sum(getFrame(img,2)))
+  img.list[[title]] <- y
+}
+```
+
+### data manipulation 
+
+```{r}
+dat.og.g <- t(as.data.frame(g.list))
+dat.og.r <- t(as.data.frame(r.list))
+dat.og.img <- t(as.data.frame(img.list))
+dat.og <- as.data.frame(cbind(dat.og.g, dat.og.r, dat.og.img))
+
+colnames(dat.og) <- c("live","dead","sumR", "sumG")
+
+dat.og$ldRatio <- log(dat.og$dead +1/ dat.og$live +1) # log transforming 
+dat.og$grSumRatio <- log(dat.og$sumR +1/ dat.og$sumG +1)
+```
+
+### histogramns of imbalance ratios 
+
+```{r}
+hist(dat$ldRatio)
+hist(dat.og$ldRatio)
+
+hist(dat$grSumRatio)
+hist(dat.og$grSumRatio)
+```
+
+### regression 
+
+```{r}
+
+grSum <- lm(dat$grSumRatio~dat$ldRatio)
+summary(grSum)
+
+grSum.og <- lm(dat.og$grSumRatio~dat.og$ldRatio)
+summary(grSum.og)
+
+```
+
+### plotting regression 
+
+```{r}
+
+p1 <- ggplot(dat, aes(x = ldRatio, y = grSumRatio)) +
+        geom_point(size = 2) +  # Scatter plot
+        geom_smooth(method = "lm", se = FALSE, color = "red") +
+        labs(x = "Log Live Dead Imbalance", y = "Log Red Green Imbalance") +
+        theme_minimal() +
+        theme(aspect.ratio=1) +
+        theme(axis.title.x = element_text(size = 16)) +
+        theme(axis.title.y = element_text(size = 16)) +
+        theme(axis.text.x = element_text(size = 12)) +
+        theme(axis.text.y = element_text(size = 12)) +
+        ggtitle("R-squared = 0.41, p = < 0.001") +
+        theme(plot.title = element_text(size = 18))
+
+p2 <- ggplot(dat.og, aes(x = ldRatio, y = grSumRatio)) +
+        geom_point(size = 2) +  # Scatter plot
+        geom_smooth(method = "lm", se = FALSE, color = "red") +
+        labs(x = "Log Live Dead Imbalance", y = "Log Red Green Imbalance") +
+        theme_minimal() +
+        theme(aspect.ratio=1) +
+        theme(axis.title.x = element_text(size = 16)) +
+        theme(axis.title.y = element_text(size = 16)) +
+        theme(axis.text.x = element_text(size = 12)) +
+        theme(axis.text.y = element_text(size = 12)) +
+        ggtitle("R-squared = 0.25, p = < 0.001") +
+        theme(plot.title = element_text(size = 18))
+
+grid.arrange(p1,p2, ncol =2)
+
+```
+
+### descriptive stats - total cell count 
+
+```{r}
+SE <- function(data) {
+  se_value <- sd(data) / sqrt(length(data))
+  return(se_value)
+}
+
+cellCount <- rowSums(dat[,c("dead", "live")])
+cellCount.og <- rowSums(dat.og[,c("dead", "live")])
+
+mean(cellCount)
+SE(cellCount)
+
+mean(cellCount.og)
+SE(cellCount.og)
+
+hist(cellCount)
+hist(cellCount.og)
+```
+
+### descriptive stats - dead/live cell counts
+
+```{r}
+mean(dat$dead)
+mean(dat$live)
+hist(dat$dead)
+hist(dat$live)
+
+mean(dat.og$dead)
+mean(dat.og$live)
+hist(dat.og$dead)
+hist(dat.og$live)
+
+
+mean(dat$dead / dat$live)
+
+mean(dat.og$dead / dat.og$live)
+
+
+plot(dat$dead~dat$live)
+plot(dat.og$dead~dat.og$live)
+```
+

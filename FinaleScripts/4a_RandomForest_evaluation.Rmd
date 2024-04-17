@@ -1,0 +1,215 @@
+---
+title: "RandomForest_evaluation"
+author: "Drew Steele"
+date: "2024-04-06"
+output: html_document
+---
+
+### evalauation of standard random forrest and data imbalance techniques 
+
+
+```{r}
+
+library(randomForestSRC)
+library(caret)
+library(ROSE)
+library(imbalance)
+library(corrplot)
+library(nortest)
+library(GGally)
+
+```
+
+### defining variables 
+
+```{r}
+
+dir1 <- "results_good/CellInfo/"
+
+datName1 <- "1_48_PAA_40_2"
+datName2 <- "1_48_PAA_40_3"
+
+```
+
+### loading data 
+
+```{r}
+
+dat1 <- read.csv(paste0(dir1, datName1, ".All.Inf.csv"))
+dat1$condition <- as.factor(dat1$condition)
+
+dat2 <- read.csv(paste0(dir1, datName2, ".All.Inf.csv"))
+dat2$condition <- as.factor(dat2$condition)
+  
+datAll <- rbind(dat1,dat2)
+  
+str(dat1)
+str(dat2)
+str(datAll)
+
+
+```
+
+### correlation test 
+
+```{r}
+par(mfrow = c(1,1))
+
+corVals <- cor(datAll[,6:17])
+
+corrplot(corVals)
+
+```
+
+### selecting features
+
+```{r}
+varSelect <- c("condition", "densityVal", "liveMeanDist", "deadMeanDist", "deadNV", "liveNV", "n.tri", "dir.area")
+#varSelect <- c("condition", "densityVal", "deadNV", "liveNV", "n.tri", "dir.area")
+#varSelect <- c("condition", "deadNV", "liveNV", "n.tri")
+#varSelect <- c("condition", "densityVal", "n.tri", "dir.area")
+```
+
+### splitting data 
+
+```{r}
+
+set.seed(101)
+
+
+train1 <- dat1[, varSelect]
+train2 <- dat2[, varSelect]
+
+indexAll <- createDataPartition(datAll$condition, p = 0.7, list = FALSE) # taking 40% of data
+trainAll <- datAll[indexAll, varSelect]
+testAll <- datAll[-indexAll, varSelect]
+
+summary(train1)
+summary(train2)
+summary(trainAll)
+summary(testAll)
+
+
+```
+
+### creatign synthetic data with SMOTE 
+
+```{r}
+
+set.seed(101)
+
+newDat1 <- mwmote(train1, numInstances = 200, classAttr = "condition")
+newDat2 <- mwmote(train2, numInstances = 200, classAttr = "condition")
+newDatAll <- mwmote(trainAll, numInstances = 200, classAttr = "condition")
+
+SMOTEdat1 <- rbind(newDat1, train1)
+SMOTEdat2 <- rbind(newDat2, train2)
+SMOTEdatAll <- rbind(newDatAll, trainAll)
+
+```
+
+### splitting data - over + under sampling 
+
+```{r}
+
+set.seed(101)
+
+dataBalance1 <- ovun.sample(condition~., data=train1, p=0.3,
+                        seed=1, method="both")$data
+
+dataBalance2 <- ovun.sample(condition~., data=train2, p=0.3,
+                        seed=1, method="both")$data
+
+dataBalanceAll <- ovun.sample(condition~., data=trainAll, p=0.3,
+                        seed=1, method="both")$data
+
+sum(dataBalance1$condition == "0")
+sum(dataBalance1$condition == "1")
+
+```
+
+### creating models
+
+```{r}
+
+set.seed(101)
+
+mod.1 <- rfsrc(condition ~ ., train1, importance = T)
+mod.2 <-  rfsrc(condition ~ ., train2, importance = T)
+mod.All <-  rfsrc(condition ~ ., trainAll, importance = T)
+
+mod.1.ovun <-  rfsrc(condition ~ ., dataBalance1, importance = T)
+mod.2.ovun <-  rfsrc(condition ~ ., dataBalance2, importance = T)
+mod.All.ovun <-  rfsrc(condition ~ ., dataBalanceAll, importance = T)
+
+mod.1.SMOTE <-  rfsrc(condition ~ ., SMOTEdat1, importance = T)
+mod.2.SMOTE <-  rfsrc(condition ~ ., SMOTEdat2, importance = T)
+mod.All.SMOTE <-  rfsrc(condition ~ ., SMOTEdatAll, importance = T)
+
+```
+
+### evaluating models - standard
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(mod.1)
+print(predict(mod.1, train2))
+plot(mod.1)
+
+
+print(mod.2)
+print(predict(mod.2, train1))
+plot(mod.2)
+
+
+print(mod.All)
+print(predict(mod.All, testAll))
+plot(mod.All)
+
+```
+
+### evaluating models - ovun smapling
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(mod.1.ovun)
+print(predict(mod.1.ovun, train2))
+plot(mod.1.ovun)
+
+
+print(mod.2.ovun)
+print(predict(mod.2.ovun, train1))
+plot(mod.2.ovun)
+
+
+print(mod.All.ovun)
+print(predict(mod.All.ovun, testAll))
+plot(mod.All.ovun)
+
+```
+
+### evaluating models - SMOTE
+
+```{r}
+
+par(mar = c(3,3,3,3))
+
+print(mod.1.SMOTE)
+print(predict(mod.1.SMOTE, train2))
+plot(mod.1.SMOTE)
+
+
+print(mod.2.SMOTE)
+print(predict(mod.2.SMOTE, train1))
+plot(mod.2.SMOTE)
+
+
+print(mod.All.SMOTE)
+print(predict(mod.All.SMOTE, testAll))
+plot(mod.All.SMOTE)
+
+```
